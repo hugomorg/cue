@@ -16,6 +16,7 @@ defmodule Cue.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
+      mod: {Cue.Application, []},
       extra_applications: [:logger]
     ]
   end
@@ -24,7 +25,8 @@ defmodule Cue.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.10"},
-      {:postgrex, "~> 0.17", only: [:test]}
+      {:postgrex, "~> 0.17", only: [:test]},
+      {:jason, "~> 1.4"}
     ]
   end
 

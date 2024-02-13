@@ -3,16 +3,13 @@ defmodule Cue do
   Documentation for `Cue`.
   """
 
-  @doc """
-  Hello world.
+  @callback handle_job(any()) :: :ok | {:ok, map()} | {:error, any()}
+  @callback handle_job_error(any()) :: :ok | {:ok, map()} | {:error, any()}
 
-  ## Examples
-
-      iex> Cue.hello()
-      :world
-
-  """
-  def hello do
-    :world
+  defmacro __using__(_) do
+    quote do
+      @behaviour Cue
+      @cue __MODULE__
+    end
   end
 end
