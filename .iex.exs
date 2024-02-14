@@ -6,8 +6,9 @@ if Code.ensure_loaded?(Cue.FetchCurrency) do
     TestRepo.insert!(%Job{
       name: "fetch_fx",
       handler: :erlang.term_to_binary(Cue.FetchCurrency),
-      run_at: DateTime.utc_now() |> DateTime.add(5) |> DateTime.truncate(:second),
+      run_at: DateTime.utc_now() |> DateTime.add(2) |> DateTime.truncate(:second),
       interval: 5,
-    }, on_conflict: :nothing, conflict_target: :name)
+      status: :not_started,
+    }, on_conflict: {:replace, [:run_at, :status]}, conflict_target: :name)
   end
 end

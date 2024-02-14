@@ -12,6 +12,7 @@ defmodule Cue.TestRepo.Migrations.CreateJobsTable do
       add :last_succeeded_at, :utc_datetime_usec
       add :last_failed_at, :utc_datetime_usec
       add :interval, :integer
+      add :status, :smallint, null: false
 
       timestamps(updated_at: false)
     end

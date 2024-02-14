@@ -4,7 +4,7 @@ defmodule Cue.FetchCurrency do
   @impl true
   def handle_job(last_job) do
     # pretend to fetch forex rates
-    :timer.sleep(1000)
+    :timer.sleep(3000)
 
     IO.inspect(last_job)
 
