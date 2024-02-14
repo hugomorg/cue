@@ -38,7 +38,8 @@ defmodule Cue.Scheduler do
                   last_failed_at: now,
                   run_at: DateTime.add(now, job.interval),
                   last_error: inspect(reason)
-                ]
+                ],
+                inc: [retry_count: 1]
               )
 
             {:ok, context} ->
@@ -50,7 +51,8 @@ defmodule Cue.Scheduler do
                 set: [
                   last_succeeded_at: now,
                   run_at: DateTime.add(now, job.interval),
-                  context: context
+                  context: context,
+                  retry_count: 0
                 ]
               )
 
@@ -60,7 +62,11 @@ defmodule Cue.Scheduler do
               Cue.Schemas.Job
               |> where(id: ^job.id)
               |> Cue.TestRepo.update_all(
-                set: [last_succeeded_at: now, run_at: DateTime.add(now, job.interval)]
+                set: [
+                  last_succeeded_at: now,
+                  run_at: DateTime.add(now, job.interval),
+                  retry_count: 0
+                ]
               )
           end
         rescue
@@ -75,7 +81,8 @@ defmodule Cue.Scheduler do
                 last_failed_at: now,
                 run_at: DateTime.add(now, job.interval),
                 last_error: inspect(error)
-              ]
+              ],
+              inc: [retry_count: 1]
             )
         end
       else
