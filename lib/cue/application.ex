@@ -7,7 +7,7 @@ defmodule Cue.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [Cue.Scheduler]
+    children = [Cue.Processor, {Task.Supervisor, name: Cue.TaskProcessor}, Cue.Scheduler]
 
     children =
       if Mix.env() == :test do

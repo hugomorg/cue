@@ -18,4 +18,8 @@ defmodule Cue.Schemas.Job do
 
     timestamps(updated_at: false)
   end
+
+  def change(job, updates \\ %{}) do
+    Ecto.Changeset.change(job, updates)
+  end
 end
