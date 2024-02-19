@@ -6,7 +6,7 @@ defmodule Cue.FetchCurrency do
     # pretend to fetch forex rates
     :timer.sleep(3000)
 
-    IO.inspect(last_job)
+    IO.inspect(last_job, label: "last_job")
 
     case :rand.uniform() do
       n when n < 0.2 ->
@@ -22,7 +22,7 @@ defmodule Cue.FetchCurrency do
 
   @impl true
   def handle_job_error(last_job) do
-    IO.inspect(last_job)
+    IO.inspect(last_job, label: "handle_job_error")
 
     :ok
   end

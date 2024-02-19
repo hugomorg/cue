@@ -13,35 +13,31 @@ defmodule Cue.Processor do
 
   @impl true
   def init(_) do
-    {:ok, %{jobs: %{}}}
+    {:ok, %{refs: %{}}}
   end
 
   # Processing logic
   def process_job(job) do
-    GenServer.call(__MODULE__, {:start_task, job})
+    GenServer.call(__MODULE__, {:start_task, nil, job})
   end
 
   @impl true
   # In this case the task is already running, so we just return :ok.
-  def handle_call({:start_task, job}, _from, %{jobs: jobs} = state)
-      when is_map_key(jobs, job.id) do
-    Logger.debug("already handling job=#{job.id}")
-
+  def handle_call({:start_task, ref, job}, _from, %{refs: refs} = state)
+      when is_map_key(refs, ref) do
     {:reply, :ok, state}
   end
 
   @impl true
   # The task is not running yet, so let's start it.
-  def handle_call({:start_task, job}, _from, %{jobs: jobs} = state) do
-    Logger.debug("handling job=#{job.id}")
-
-    _task =
+  def handle_call({:start_task, _ref, job}, _from, %{refs: refs} = state) do
+    task =
       Task.Supervisor.async_nolink(Cue.TaskProcessor, fn ->
         handle_job(job)
       end)
 
     # We return :ok and the server will continue running
-    {:reply, :ok, %{state | jobs: Map.put(jobs, job.id, job)}}
+    {:reply, :ok, %{state | refs: Map.put(refs, task.ref, %{task: task, job: job})}}
   end
 
   # def handle_call(call, from, state) do
@@ -52,7 +48,6 @@ defmodule Cue.Processor do
   @impl true
   # Skipping because of lock
   def handle_info({ref, {:ok, :locked}}, state) do
-    Logger.debug("skipping - locked")
     # We don't care about the DOWN message now, so let's demonitor and flush it
     Process.demonitor(ref, [:flush])
     {:noreply, state}
@@ -60,17 +55,18 @@ defmodule Cue.Processor do
 
   @impl true
   # The task completed successfully
-  def handle_info({ref, {:ok, job}}, %{jobs: jobs} = state) do
-    Logger.debug("finished ok result=#{inspect(job)}")
+  def handle_info({ref, {:ok, job}}, %{refs: refs} = state) do
     Process.demonitor(ref, [:flush])
-    {:noreply, %{state | jobs: Map.delete(jobs, job.id)}}
+    {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
 
   # The task failed
-  def handle_info({:DOWN, _ref, :process, _pid, reason}, %{jobs: jobs} = state) do
-    Logger.debug("error reason=#{inspect(reason)}")
-    # Log and possibly restart the task...
-    {:noreply, %{state | jobs: jobs}}
+  def handle_info({:DOWN, ref, :process, _pid, error}, %{refs: refs} = state) do
+    %{job: job} = Map.fetch!(refs, ref)
+    update_job_as_failed(job, error)
+    # process_job(job)
+    Process.demonitor(ref, [:flush])
+    {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
 
   def handle_job(job) do
@@ -78,36 +74,30 @@ defmodule Cue.Processor do
 
     with {:ok, %{job: job}} <-
            Ecto.Multi.new()
-           |> Ecto.Multi.run(:job, fn _repo, _changes ->
-             job =
-               Job
-               |> where([j], j.id == ^job.id and j.status != :processing)
-               |> lock("FOR UPDATE SKIP LOCKED")
-               |> @repo.one
-
+           |> Ecto.Multi.one(
+             :lock,
+             Job
+             |> where([j], j.id == ^job.id and j.status != :processing)
+             |> lock("FOR UPDATE SKIP LOCKED")
+           )
+           |> Ecto.Multi.run(:job, fn _repo, %{lock: job} ->
              job =
                if job do
-                 job |> Job.change(status: :processing) |> @repo.update
+                 job = job |> Job.change(status: :processing) |> @repo.update!
                  handler = job.handler |> :erlang.binary_to_term() |> validate_handler!
 
-                 try do
-                   case apply_handler(handler, job) do
-                     {:error, error} ->
-                       update_job_as_failed(job, error)
-
-                     {:ok, context} ->
-                       update_job_as_success!(job, context)
-
-                     :ok ->
-                       update_job_as_success!(job, job.context)
-                   end
-                 rescue
-                   error ->
-                     Logger.error("handler crashed: #{inspect(error)}")
+                 case apply_handler(handler, job) do
+                   {:error, error} ->
                      update_job_as_failed(job, error)
+
+                   {:ok, context} ->
+                     update_job_as_success!(job, context)
+
+                   :ok ->
+                     update_job_as_success!(job, job.context)
                  end
                else
-                 IO.inspect("skipping, locked")
+                 IO.inspect("SKIPPING -- LOCKED")
                  :locked
                end
 
