@@ -23,7 +23,7 @@ defmodule Cue.Processor do
 
   @impl true
   # In this case the task is already running, so we just return :ok.
-  def handle_call({:start_task, ref, job}, _from, %{refs: refs} = state)
+  def handle_call({:start_task, ref, _job}, _from, %{refs: refs} = state)
       when is_map_key(refs, ref) do
     {:reply, :ok, state}
   end
@@ -55,7 +55,7 @@ defmodule Cue.Processor do
 
   @impl true
   # The task completed successfully
-  def handle_info({ref, {:ok, job}}, %{refs: refs} = state) do
+  def handle_info({ref, {:ok, _job}}, %{refs: refs} = state) do
     Process.demonitor(ref, [:flush])
     {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
