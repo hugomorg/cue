@@ -88,27 +88,23 @@ defmodule Cue.Processor do
              job =
                if job do
                  job |> Job.change(status: :processing) |> @repo.update
-                 handler = :erlang.binary_to_term(job.handler)
+                 handler = job.handler |> :erlang.binary_to_term() |> validate_handler!
 
-                 if function_exported?(handler, :handle_job, 1) do
-                   try do
-                     case handler.handle_job(job) do
-                       {:error, error} ->
-                         update_job_as_failed(job, error)
-
-                       {:ok, context} ->
-                         update_job_as_success!(job, context)
-
-                       :ok ->
-                         update_job_as_success!(job, job.context)
-                     end
-                   rescue
-                     error ->
-                       Logger.error("handler crashed: #{inspect(error)}")
+                 try do
+                   case apply_handler(handler, job) do
+                     {:error, error} ->
                        update_job_as_failed(job, error)
+
+                     {:ok, context} ->
+                       update_job_as_success!(job, context)
+
+                     :ok ->
+                       update_job_as_success!(job, job.context)
                    end
-                 else
-                   raise "handler #{inspect(handler)} not found or does not implement handle_job/1"
+                 rescue
+                   error ->
+                     Logger.error("handler crashed: #{inspect(error)}")
+                     update_job_as_failed(job, error)
                  end
                else
                  IO.inspect("skipping, locked")
@@ -143,5 +139,29 @@ defmodule Cue.Processor do
       status: :succeeded
     )
     |> @repo.update!
+  end
+
+  defp validate_handler!(handler) when is_atom(handler) do
+    if function_exported?(handler, :handle_job, 1) do
+      handler
+    else
+      raise "handler #{inspect(handler)} not a module or handle_job is not defined"
+    end
+  end
+
+  defp validate_handler!({module, fun}) when is_atom(module) and is_atom(fun) do
+    if function_exported?(module, fun, 1) do
+      {module, fun}
+    else
+      raise "handler #{inspect(module)} not a module or #{inspect(fun)} is not defined"
+    end
+  end
+
+  defp apply_handler({module, fun}, job) do
+    apply(module, fun, [job])
+  end
+
+  defp apply_handler(handler, job) do
+    apply(handler, :handle_job, [job])
   end
 end
