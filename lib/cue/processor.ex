@@ -63,8 +63,7 @@ defmodule Cue.Processor do
   # The task failed
   def handle_info({:DOWN, ref, :process, _pid, error}, %{refs: refs} = state) do
     %{job: job} = Map.fetch!(refs, ref)
-    update_job_as_failed(job, error)
-    # process_job(job)
+    update_job_as_failed!(job, error)
     Process.demonitor(ref, [:flush])
     {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
@@ -75,59 +74,62 @@ defmodule Cue.Processor do
     with {:ok, %{job: job}} <-
            Ecto.Multi.new()
            |> Ecto.Multi.one(
-             :lock,
+             :free_job,
              Job
              |> where([j], j.id == ^job.id and j.status != :processing)
              |> lock("FOR UPDATE SKIP LOCKED")
            )
-           |> Ecto.Multi.run(:job, fn _repo, %{lock: job} ->
-             job =
-               if job do
-                 job = job |> Job.change(status: :processing) |> @repo.update!
-                 handler = job.handler |> :erlang.binary_to_term() |> validate_handler!
-
-                 case apply_handler(handler, job) do
-                   {:error, error} ->
-                     update_job_as_failed(job, error)
-
-                   {:ok, context} ->
-                     update_job_as_success!(job, context)
-
-                   :ok ->
-                     update_job_as_success!(job, job.context)
-                 end
-               else
-                 IO.inspect("SKIPPING -- LOCKED")
-                 :locked
-               end
-
-             {:ok, job}
-           end)
+           |> Ecto.Multi.run(:job, fn _repo, changes -> maybe_handle_job(changes) end)
            |> @repo.transaction() do
       {:ok, job}
     end
   end
 
-  defp update_job_as_failed(job, error) do
-    {1, [job]} =
-      Job
-      |> Job.update_as_failed(job, error)
-      |> @repo.update_all([])
+  defp maybe_handle_job(%{free_job: nil}), do: {:ok, :locked}
+
+  defp maybe_handle_job(changes) do
+    job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
+    handler = job.handler |> :erlang.binary_to_term() |> validate_handler!
+
+    case apply_handler(handler, job) do
+      {:error, error} ->
+        update_job_as_failed!(job, error)
+
+      {:ok, context} ->
+        update_job_as_success!(job, context)
+
+      :ok ->
+        update_job_as_success!(job, job.context)
+    end
+
+    {:ok, job}
+  end
+
+  defp update_job_as_failed!(job, error) do
+    now = DateTime.utc_now()
 
     job
+    |> Job.changeset(%{
+      last_failed_at: now,
+      last_error: inspect(error),
+      run_at: now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
+      retry_count: job.retry_count + 1,
+      status: :failed
+    })
+    |> @repo.update!
   end
 
   defp update_job_as_success!(job, context) do
     now = DateTime.utc_now()
 
     job
-    |> Job.change(
+    |> Job.changeset(%{
       last_succeeded_at: now,
       run_at: now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
       context: context,
       retry_count: 0,
       status: :succeeded
-    )
+    })
     |> @repo.update!
   end
 
