@@ -119,7 +119,7 @@ defmodule Cue.Processor do
   end
 
   defp update_job_as_failed(job, error) do
-    {1, job} =
+    {1, [job]} =
       Job
       |> Job.update_as_failed(job, error)
       |> @repo.update_all([])
