@@ -90,88 +90,26 @@ defmodule Cue.Processor do
                  job |> Job.change(status: :processing) |> @repo.update
                  handler = :erlang.binary_to_term(job.handler)
 
-                 job =
-                   if function_exported?(handler, :handle_job, 1) do
-                     try do
-                       job =
-                         case handler.handle_job(job) do
-                           {:error, reason} ->
-                             now = DateTime.utc_now()
+                 if function_exported?(handler, :handle_job, 1) do
+                   try do
+                     case handler.handle_job(job) do
+                       {:error, error} ->
+                         update_job_as_failed(job, error)
 
-                             {_, job} =
-                               Job
-                               |> where(id: ^job.id)
-                               |> update(inc: [retry_count: 1])
-                               |> update(
-                                 set: [
-                                   last_failed_at: ^now,
-                                   run_at:
-                                     ^(now
-                                       |> DateTime.add(job.interval)
-                                       |> DateTime.truncate(:second)),
-                                   last_error: ^inspect(reason),
-                                   status: :failed
-                                 ]
-                               )
-                               |> select([j], j)
-                               |> @repo.update_all([])
+                       {:ok, context} ->
+                         update_job_as_success!(job, context)
 
-                             job
-
-                           {:ok, context} ->
-                             now = DateTime.utc_now()
-
-                             job
-                             |> Job.change(
-                               last_succeeded_at: now,
-                               run_at:
-                                 now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
-                               context: context,
-                               retry_count: 0,
-                               status: :succeeded
-                             )
-                             |> @repo.update
-
-                           :ok ->
-                             now = DateTime.utc_now()
-
-                             job
-                             |> Job.change(
-                               last_succeeded_at: now,
-                               run_at:
-                                 now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
-                               retry_count: 0,
-                               status: :succeeded
-                             )
-                             |> @repo.update
-                         end
-                     rescue
-                       reason ->
-                         Logger.error("handler crashed: #{inspect(reason)}")
-                         now = DateTime.utc_now()
-
-                         {_, job} =
-                           Job
-                           |> where(id: ^job.id)
-                           |> update(inc: [retry_count: 1])
-                           |> update(
-                             set: [
-                               last_failed_at: ^now,
-                               run_at: ^DateTime.add(now, job.interval),
-                               last_error: ^inspect(reason),
-                               status: :failed
-                             ]
-                           )
-                           |> select([j], j)
-                           |> @repo.update_all([])
-
-                         job
+                       :ok ->
+                         update_job_as_success!(job, job.context)
                      end
-
-                     job
-                   else
-                     raise "handler #{inspect(handler)} not found or does not implement handle_job/1"
+                   rescue
+                     error ->
+                       Logger.error("handler crashed: #{inspect(error)}")
+                       update_job_as_failed(job, error)
                    end
+                 else
+                   raise "handler #{inspect(handler)} not found or does not implement handle_job/1"
+                 end
                else
                  IO.inspect("skipping, locked")
                  :locked
@@ -182,5 +120,28 @@ defmodule Cue.Processor do
            |> @repo.transaction() do
       {:ok, job}
     end
+  end
+
+  defp update_job_as_failed(job, error) do
+    {1, job} =
+      Job
+      |> Job.update_as_failed(job, error)
+      |> @repo.update_all([])
+
+    job
+  end
+
+  defp update_job_as_success!(job, context) do
+    now = DateTime.utc_now()
+
+    job
+    |> Job.change(
+      last_succeeded_at: now,
+      run_at: now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
+      context: context,
+      retry_count: 0,
+      status: :succeeded
+    )
+    |> @repo.update!
   end
 end
