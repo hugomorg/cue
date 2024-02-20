@@ -5,7 +5,7 @@ defmodule Cue.Processor do
   require Logger
   import Ecto.Query
   alias Cue.Schemas.Job
-  @repo Cue.TestRepo
+  @repo Application.compile_env!(:cue, :repo)
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: Keyword.get(args, :name, __MODULE__))
