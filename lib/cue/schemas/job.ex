@@ -29,7 +29,8 @@ defmodule Cue.Schemas.Job do
       :last_failed_at,
       :last_error,
       :run_at,
-      :retry_count
+      :retry_count,
+      :context
     ])
     |> validate_required([:status, :run_at])
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
