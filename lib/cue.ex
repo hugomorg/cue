@@ -13,6 +13,7 @@ defmodule Cue do
     quote do
       @behaviour Cue
       @repo Application.compile_env!(:cue, :repo)
+      @cue_name unquote(name)
 
       def put_on_queue do
         @repo.insert!(
@@ -28,6 +29,14 @@ defmodule Cue do
           on_conflict: :nothing,
           conflict_target: :name
         )
+      end
+
+      def delete_from_queue do
+        require Ecto.Query
+
+        Cue.Schemas.Job
+        |> Ecto.Query.where(name: @cue_name)
+        |> @repo.delete_all()
       end
     end
   end
