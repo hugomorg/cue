@@ -16,8 +16,7 @@ defmodule Cue do
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       def put_on_queue! do
-        run_at =
-          unquote(schedule) |> Cron.new!() |> Cron.next() |> DateTime.from_naive!("Etc/UTC")
+        run_at = Cue.Schemas.Job.next_run_at(unquote(schedule))
 
         @repo.insert!(
           %Cue.Schemas.Job{

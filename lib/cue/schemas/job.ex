@@ -34,4 +34,12 @@ defmodule Cue.Schemas.Job do
     |> validate_required([:status, :run_at])
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
   end
+
+  def next_run_at(%__MODULE__{schedule: schedule}) do
+    next_run_at(schedule)
+  end
+
+  def next_run_at(schedule) when is_binary(schedule) do
+    schedule |> Cron.new!() |> Cron.next() |> DateTime.from_naive!("Etc/UTC")
+  end
 end
