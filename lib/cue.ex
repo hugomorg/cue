@@ -15,7 +15,7 @@ defmodule Cue do
       @repo Application.compile_env!(:cue, :repo)
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
-      def put_on_queue do
+      def put_on_queue! do
         run_at =
           unquote(schedule) |> Cron.new!() |> Cron.next() |> DateTime.from_naive!("Etc/UTC")
 
@@ -29,16 +29,20 @@ defmodule Cue do
             status: :not_started
           },
           on_conflict: :nothing,
-          conflict_target: :name
+          conflict_target: :name,
+          returning: true
         )
       end
 
       def delete_from_queue do
         require Ecto.Query
 
-        Cue.Schemas.Job
-        |> Ecto.Query.where(name: @cue_name)
-        |> @repo.delete_all()
+        {count, _returned} =
+          Cue.Schemas.Job
+          |> Ecto.Query.where(name: @cue_name)
+          |> @repo.delete_all()
+
+        count
       end
     end
   end
