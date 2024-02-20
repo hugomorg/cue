@@ -9,6 +9,7 @@ defmodule Cue do
   defmacro __using__(opts) do
     name = Keyword.get(opts, :name)
     schedule = Keyword.fetch!(opts, :schedule)
+    run_immediately = Keyword.get(opts, :run_immediately)
 
     quote do
       @behaviour Cue
@@ -16,7 +17,12 @@ defmodule Cue do
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       def put_on_queue! do
-        run_at = Cue.Schemas.Job.next_run_at(unquote(schedule))
+        run_at =
+          if unquote(run_immediately) do
+            DateTime.utc_now()
+          else
+            Cue.Schemas.Job.next_run_at(unquote(schedule))
+          end
 
         @repo.insert!(
           %Cue.Schemas.Job{
