@@ -114,7 +114,7 @@ defmodule Cue.Processor do
     |> Job.changeset(%{
       last_failed_at: now,
       last_error: inspect(error),
-      run_at: now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
+      run_at: next_run_at(job),
       retry_count: job.retry_count + 1,
       status: :failed
     })
@@ -127,7 +127,7 @@ defmodule Cue.Processor do
     job
     |> Job.changeset(%{
       last_succeeded_at: now,
-      run_at: now |> DateTime.add(job.interval) |> DateTime.truncate(:second),
+      run_at: next_run_at(job),
       context: context,
       retry_count: 0,
       status: :succeeded
@@ -163,5 +163,9 @@ defmodule Cue.Processor do
       handler -> validate_handler!({handler, :handle_job_error})
     end
     |> apply_handler(job)
+  end
+
+  defp next_run_at(job) do
+    job.schedule |> Cron.new!() |> Cron.next() |> DateTime.from_naive!("Etc/UTC")
   end
 end

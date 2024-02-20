@@ -8,11 +8,11 @@ defmodule Cue.TestRepo.Migrations.CreateJobsTable do
       add :error_handler, :binary, null: false
       add :retry_count, :integer, default: 0, null: false
       add :run_at, :utc_datetime, null: false
+      add :schedule, :string
       add :last_error, :text
       add :context, :map
       add :last_succeeded_at, :utc_datetime_usec
       add :last_failed_at, :utc_datetime_usec
-      add :interval, :integer
       add :status, :smallint, null: false
 
       timestamps(updated_at: false)

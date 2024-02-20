@@ -10,12 +10,12 @@ defmodule Cue.Schemas.Job do
     field(:handler, CryptoFundingTracker.Handler)
     field(:error_handler, CryptoFundingTracker.Handler)
     field(:last_error, :string)
+    field(:schedule, :string)
     field(:retry_count, :integer)
     field(:context, :map)
     field(:last_succeeded_at, :utc_datetime_usec)
     field(:last_failed_at, :utc_datetime_usec)
     field(:run_at, :utc_datetime)
-    field(:interval, :integer)
     field(:status, Ecto.Enum, values: @status_values)
 
     timestamps(updated_at: false)
