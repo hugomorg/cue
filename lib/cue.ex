@@ -7,18 +7,18 @@ defmodule Cue do
   @callback handle_job_error(any()) :: :ok | {:ok, map()} | {:error, any()}
 
   defmacro __using__(opts) do
-    name = Keyword.fetch!(opts, :name)
+    name = Keyword.get(opts, :name)
     schedule = Keyword.fetch!(opts, :schedule)
 
     quote do
       @behaviour Cue
       @repo Application.compile_env!(:cue, :repo)
-      @cue_name unquote(name)
+      @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       def put_on_queue do
         @repo.insert!(
           %Cue.Schemas.Job{
-            name: unquote(name),
+            name: @cue_name,
             handler: __MODULE__,
             error_handler: __MODULE__,
             run_at:
