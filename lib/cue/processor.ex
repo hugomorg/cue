@@ -140,10 +140,12 @@ defmodule Cue.Processor do
   end
 
   defp validate_handler!({module, fun}) when is_atom(module) and is_atom(fun) do
-    if function_exported?(module, fun, 1) do
-      {module, fun}
-    else
-      raise "handler #{inspect(module)} not a module or #{inspect(fun)} is not defined"
+    module_exists? = Code.ensure_loaded?(module)
+
+    cond do
+      module_exists? and function_exported?(module, fun, 1) -> {module, fun}
+      module_exists? -> raise "#{inspect(fun)} is not defined"
+      :else -> "handler #{inspect(module)} not a module"
     end
   end
 
