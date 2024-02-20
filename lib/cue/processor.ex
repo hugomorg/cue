@@ -78,7 +78,7 @@ defmodule Cue.Processor do
            |> Ecto.Multi.one(
              :free_job,
              Job
-             |> where([j], j.id == ^job.id and j.status != :processing)
+             |> where([j], j.id == ^job.id and j.status != :processing and j.status != :paused)
              |> lock("FOR UPDATE SKIP LOCKED")
            )
            |> Ecto.Multi.run(:job, fn _repo, changes -> maybe_handle_job(changes) end)
@@ -109,6 +109,14 @@ defmodule Cue.Processor do
 
   defp update_job_as_failed!(job, error) do
     now = DateTime.utc_now()
+    retry_count = job.retry_count + 1
+
+    status =
+      if is_integer(job.max_retries) and retry_count >= job.max_retries do
+        :paused
+      else
+        :failed
+      end
 
     job
     |> Job.changeset(%{
@@ -116,7 +124,7 @@ defmodule Cue.Processor do
       last_error: inspect(error),
       run_at: Job.next_run_at(job),
       retry_count: job.retry_count + 1,
-      status: :failed
+      status: status
     })
     |> @repo.update!
   end

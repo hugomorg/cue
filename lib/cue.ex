@@ -7,7 +7,15 @@ defmodule Cue do
   @callback handle_job_error(any()) :: :ok | {:ok, map()} | {:error, any()}
 
   def enqueue!(handler, opts) do
-    opts = Keyword.validate!(opts, [:repo, :name, :schedule, :error_handler, run_now: false])
+    opts =
+      Keyword.validate!(opts, [
+        :repo,
+        :name,
+        :schedule,
+        :error_handler,
+        run_now: false,
+        max_retries: nil
+      ])
 
     run_at =
       if opts[:run_now] do
@@ -23,7 +31,8 @@ defmodule Cue do
         error_handler: opts[:error_handler],
         run_at: run_at,
         schedule: opts[:schedule],
-        status: :not_started
+        status: :not_started,
+        max_retries: opts[:max_retries]
       },
       on_conflict: :nothing,
       conflict_target: :name,
@@ -46,6 +55,7 @@ defmodule Cue do
     name = Keyword.get(opts, :name)
     schedule = Keyword.fetch!(opts, :schedule)
     run_now = Keyword.get(opts, :run_now)
+    max_retries = Keyword.get(opts, :max_retries)
 
     quote do
       @behaviour Cue
@@ -58,7 +68,8 @@ defmodule Cue do
           error_handler: __MODULE__,
           schedule: unquote(schedule),
           repo: @repo,
-          run_now: unquote(run_now)
+          run_now: unquote(run_now),
+          max_retries: unquote(max_retries)
         )
       end
 
