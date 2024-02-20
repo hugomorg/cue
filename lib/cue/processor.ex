@@ -91,7 +91,7 @@ defmodule Cue.Processor do
 
   defp maybe_handle_job(changes) do
     job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
-    handler = job.handler |> :erlang.binary_to_term() |> validate_handler!
+    handler = validate_handler!(job.handler)
 
     case apply_handler(handler, job) do
       {:error, error} ->
@@ -158,9 +158,7 @@ defmodule Cue.Processor do
   end
 
   defp maybe_apply_error_handler(job) do
-    job.error_handler
-    |> :erlang.binary_to_term()
-    |> case do
+    case job.error_handler do
       {module, fun} -> validate_handler!({module, fun})
       handler -> validate_handler!({handler, :handle_job_error})
     end

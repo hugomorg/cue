@@ -7,8 +7,8 @@ defmodule Cue.Schemas.Job do
 
   schema "jobs" do
     field(:name, :string)
-    field(:handler, :binary)
-    field(:error_handler, :binary)
+    field(:handler, CryptoFundingTracker.Handler)
+    field(:error_handler, CryptoFundingTracker.Handler)
     field(:last_error, :string)
     field(:retry_count, :integer)
     field(:context, :map)

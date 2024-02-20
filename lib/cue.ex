@@ -19,8 +19,8 @@ defmodule Cue do
         @repo.insert!(
           %Cue.Schemas.Job{
             name: unquote(name),
-            handler: :erlang.term_to_binary(__MODULE__),
-            error_handler: :erlang.term_to_binary(__MODULE__),
+            handler: __MODULE__,
+            error_handler: __MODULE__,
             run_at:
               DateTime.utc_now() |> DateTime.add(unquote(schedule)) |> DateTime.truncate(:second),
             interval: unquote(schedule),
