@@ -1,5 +1,5 @@
 defmodule Cue.FetchCurrency do
-  use Cue
+  use Cue, name: "fetch_currency", schedule: 10
 
   @impl true
   def handle_job(last_job) do
