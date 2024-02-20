@@ -5,6 +5,7 @@ defmodule Cue.TestRepo.Migrations.CreateJobsTable do
     create table :jobs do
       add :name, :string, null: false
       add :handler, :binary, null: false
+      add :error_handler, :binary, null: false
       add :retry_count, :integer, default: 0, null: false
       add :run_at, :utc_datetime, null: false
       add :last_error, :text

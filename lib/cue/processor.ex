@@ -63,7 +63,9 @@ defmodule Cue.Processor do
   # The task failed
   def handle_info({:DOWN, ref, :process, _pid, error}, %{refs: refs} = state) do
     %{job: job} = Map.fetch!(refs, ref)
+    # TODO: add retry logic here
     update_job_as_failed!(job, error)
+    maybe_apply_error_handler(job)
     Process.demonitor(ref, [:flush])
     {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
@@ -134,11 +136,7 @@ defmodule Cue.Processor do
   end
 
   defp validate_handler!(handler) when is_atom(handler) do
-    if function_exported?(handler, :handle_job, 1) do
-      handler
-    else
-      raise "handler #{inspect(handler)} not a module or handle_job is not defined"
-    end
+    validate_handler!({handler, :handle_job})
   end
 
   defp validate_handler!({module, fun}) when is_atom(module) and is_atom(fun) do
@@ -154,6 +152,16 @@ defmodule Cue.Processor do
   end
 
   defp apply_handler(handler, job) do
-    apply(handler, :handle_job, [job])
+    apply_handler({handler, :handle_job}, job)
+  end
+
+  defp maybe_apply_error_handler(job) do
+    job.error_handler
+    |> :erlang.binary_to_term()
+    |> case do
+      {module, fun} -> validate_handler!({module, fun})
+      handler -> validate_handler!({handler, :handle_job_error})
+    end
+    |> apply_handler(job)
   end
 end
