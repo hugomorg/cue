@@ -14,6 +14,7 @@ defmodule Cue do
         :schedule,
         :error_handler,
         run_now: false,
+        one_off: false,
         max_retries: nil
       ])
 
@@ -32,7 +33,8 @@ defmodule Cue do
         run_at: run_at,
         schedule: opts[:schedule],
         status: :not_started,
-        max_retries: opts[:max_retries]
+        max_retries: opts[:max_retries],
+        one_off: opts[:one_off]
       },
       on_conflict: :nothing,
       conflict_target: :name,
@@ -59,6 +61,7 @@ defmodule Cue do
     schedule = Keyword.fetch!(opts, :schedule)
     run_now = Keyword.get(opts, :run_now)
     max_retries = Keyword.get(opts, :max_retries)
+    one_off = Keyword.get(opts, :one_off)
 
     quote do
       @behaviour Cue
@@ -72,7 +75,8 @@ defmodule Cue do
           schedule: unquote(schedule),
           repo: @repo,
           run_now: unquote(run_now),
-          max_retries: unquote(max_retries)
+          max_retries: unquote(max_retries),
+          one_off: unquote(one_off)
         )
       end
 

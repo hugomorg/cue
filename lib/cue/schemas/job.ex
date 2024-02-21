@@ -18,6 +18,7 @@ defmodule Cue.Schemas.Job do
     field(:last_failed_at, :utc_datetime_usec)
     field(:run_at, :utc_datetime)
     field(:status, Ecto.Enum, values: @status_values)
+    field(:one_off, :boolean)
 
     timestamps(updated_at: false)
   end
@@ -32,7 +33,8 @@ defmodule Cue.Schemas.Job do
       :run_at,
       :retry_count,
       :context,
-      :max_retries
+      :max_retries,
+      :one_off
     ])
     |> validate_required([:status, :run_at])
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
