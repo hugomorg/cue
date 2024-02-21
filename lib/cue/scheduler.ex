@@ -16,7 +16,25 @@ defmodule Cue.Scheduler do
   @impl true
   def init(_args) do
     loop(:check, @check_every_seconds)
-    {:ok, %{}}
+    {:ok, %{ignore_jobs: []}}
+  end
+
+  def add_job_to_ignored(job_name) do
+    GenServer.call(__MODULE__, {:add_job_to_ignored, job_name})
+  end
+
+  def remove_job_from_ignored(job_name) do
+    GenServer.call(__MODULE__, {:remove_job_from_ignored, job_name})
+  end
+
+  @impl true
+  def handle_call({:add_job_to_ignored, job_name}, _from, state) do
+    {:reply, :ok, %{state | ignore_jobs: [job_name | state.ignore_jobs]}}
+  end
+
+  @impl true
+  def handle_call({:remove_job_from_ignored, job_name}, _from, state) do
+    {:reply, :ok, %{state | ignore_jobs: Enum.reject(state.ignore_jobs, &(&1 == job_name))}}
   end
 
   # Scheduling logic
@@ -25,7 +43,7 @@ defmodule Cue.Scheduler do
     loop(:check, @check_every_seconds)
     jobs = Job |> where([j], ^DateTime.utc_now() >= j.run_at) |> @repo.all()
 
-    for job <- jobs do
+    for job <- jobs, job.name not in state.ignore_jobs do
       Cue.Processor.process_job(job)
     end
 

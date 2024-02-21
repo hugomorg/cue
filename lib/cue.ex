@@ -42,16 +42,19 @@ defmodule Cue do
     )
   end
 
-  def dequeue(repo, name) do
+  def dequeue(repo, job_name) do
     require Ecto.Query
+
+    # Synchronously remove job from scheduling/processing
+    Cue.Scheduler.add_job_to_ignored(job_name)
+    Cue.Processor.remove_job(job_name)
 
     {count, _returned} =
       Cue.Schemas.Job
-      |> Ecto.Query.where(name: ^name)
+      |> Ecto.Query.where(name: ^job_name)
       |> repo.delete_all()
 
-    # Synchronously remove job from processing
-    Cue.Processor.remove_job(name)
+    Cue.Scheduler.remove_job_from_ignored(job_name)
 
     count
   end
