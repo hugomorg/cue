@@ -21,6 +21,10 @@ defmodule Cue.Processor do
     GenServer.call(__MODULE__, {:start_task, nil, job})
   end
 
+  def remove_job(name) do
+    GenServer.call(__MODULE__, {:remove_task, name})
+  end
+
   @impl true
   # In this case the task is already running, so we just return :ok.
   def handle_call({:start_task, ref, _job}, _from, %{refs: refs} = state)
@@ -46,11 +50,28 @@ defmodule Cue.Processor do
   # end
 
   @impl true
+  # In this case the task is already running, so we just return :ok.
+  def handle_call({:remove_task, job_name}, _from, %{refs: %{} = refs} = state) do
+    refs =
+      case Enum.find(refs, fn {_ref, %{job: job}} -> job.name == job_name end) do
+        {ref, _value} ->
+          Logger.debug("#{job_name} removed from processing")
+          Map.delete(refs, ref)
+
+        nil ->
+          Logger.debug("no job found for #{job_name} to delete")
+          refs
+      end
+
+    {:reply, :ok, %{state | refs: refs}}
+  end
+
+  @impl true
   # Skipping because of lock
-  def handle_info({ref, {:ok, :locked}}, state) do
+  def handle_info({ref, {:ok, :locked}}, %{refs: refs} = state) do
     # We don't care about the DOWN message now, so let's demonitor and flush it
     Process.demonitor(ref, [:flush])
-    {:noreply, state}
+    {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
 
   @impl true
@@ -61,13 +82,21 @@ defmodule Cue.Processor do
   end
 
   # The task failed
-  def handle_info({:DOWN, ref, :process, _pid, error}, %{refs: refs} = state) do
-    %{job: job} = Map.fetch!(refs, ref)
+  def handle_info({:DOWN, ref, :process, _pid, error}, %{refs: refs} = state)
+      when is_map_key(refs, ref) do
+    %{job: job} = refs[ref]
     # TODO: add retry logic here
     update_job_as_failed!(job, error)
     maybe_apply_error_handler(job)
     Process.demonitor(ref, [:flush])
     {:noreply, %{state | refs: Map.delete(refs, ref)}}
+  end
+
+  # Key not in map means in all likelihood task has been deleted
+  def handle_info({:DOWN, ref, :process, _pid, _error}, state) do
+    Logger.warn("No task found - probably deleted")
+    Process.demonitor(ref, [:flush])
+    {:noreply, state}
   end
 
   def handle_job(job) do

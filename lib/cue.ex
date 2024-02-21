@@ -48,6 +48,9 @@ defmodule Cue do
       |> Ecto.Query.where(name: ^name)
       |> repo.delete_all()
 
+    # Synchronously remove job from processing
+    Cue.Processor.remove_job(name)
+
     count
   end
 
