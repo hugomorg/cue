@@ -121,9 +121,8 @@ defmodule Cue.Processor do
 
   defp maybe_handle_job(changes) do
     job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
-    handler = validate_handler!(job.handler, 2)
 
-    case apply_handler(handler, [job.name, job.context]) do
+    case apply_handler(job.handler, [job.name, job.context]) do
       {:error, error} ->
         update_job_as_failed!(job, error)
 
@@ -177,30 +176,12 @@ defmodule Cue.Processor do
     end
   end
 
-  defp validate_handler!(handler, arity) when is_atom(handler) do
-    validate_handler!({handler, :handle_job}, arity)
-  end
-
-  defp validate_handler!({module, fun}, arity) when is_atom(module) and is_atom(fun) do
-    module_exists? = Code.ensure_loaded?(module)
-
-    cond do
-      module_exists? and function_exported?(module, fun, arity) -> {module, fun}
-      module_exists? -> raise "#{inspect(fun)} is not defined"
-      :else -> raise "handler #{inspect(module)} not a module"
-    end
-  end
-
   defp apply_handler({module, fun}, args) do
     apply(module, fun, args)
   end
 
   defp maybe_apply_error_handler(job) do
-    case job.error_handler do
-      {module, fun} -> validate_handler!({module, fun}, 3)
-      handler -> validate_handler!({handler, :handle_job_error}, 3)
-    end
-    |> apply_handler([
+    apply_handler(job.error_handler, [
       job.name,
       job.context,
       %{error: job.last_error, retry_count: job.retry_count, max_retries: job.max_retries}

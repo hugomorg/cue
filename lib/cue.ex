@@ -27,6 +27,9 @@ defmodule Cue do
         context: nil
       ])
 
+    handler = validate_job_handler!(opts[:handler])
+    error_handler = validate_error_handler!(opts[:error_handler])
+
     run_at =
       if opts[:run_now] do
         DateTime.utc_now()
@@ -37,8 +40,8 @@ defmodule Cue do
     opts[:repo].insert!(
       %Cue.Schemas.Job{
         name: opts[:name],
-        handler: opts[:handler],
-        error_handler: opts[:error_handler],
+        handler: handler,
+        error_handler: error_handler,
         run_at: run_at,
         schedule: opts[:schedule],
         status: :not_started,
@@ -66,6 +69,35 @@ defmodule Cue do
     Cue.Scheduler.remove_job_from_ignored(job_name)
 
     count
+  end
+
+  defp validate_job_handler!(handler) when is_atom(handler) do
+    validate_handler!(
+      {handler, :handle_job},
+      2,
+      &"Error handling module #{inspect(&1)} doesn't exist",
+      &"Function #{inspect(&2)} given as error handling function in module #{&1} but it doesn't exist"
+    )
+  end
+
+  defp validate_error_handler!(handler) do
+    validate_handler!(
+      {handler, :handle_job_error},
+      3,
+      &"Job handling module #{inspect(&1)} doesn't exist",
+      &"Function #{inspect(&2)} given as job handling function in module #{&1} but it doesn't exist"
+    )
+  end
+
+  defp validate_handler!({module, fun}, arity, no_module_error, no_function_error)
+       when is_atom(module) and is_atom(fun) do
+    module_exists? = Code.ensure_loaded?(module)
+
+    cond do
+      module_exists? and function_exported?(module, fun, arity) -> {module, fun}
+      module_exists? -> raise "#{no_function_error.(module, fun)}"
+      :else -> raise "#{no_module_error.(module)}"
+    end
   end
 
   defmacro __using__(opts) do
