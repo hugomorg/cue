@@ -6,9 +6,10 @@ defmodule Cue do
   @callback handle_job(any()) :: :ok | {:ok, map()} | {:error, any()}
   @callback handle_job_error(any()) :: :ok | {:ok, map()} | {:error, any()}
 
-  def enqueue!(handler, opts) do
+  def enqueue!(opts) do
     opts =
       Keyword.validate!(opts, [
+        :handler,
         :repo,
         :name,
         :schedule,
@@ -28,7 +29,7 @@ defmodule Cue do
     opts[:repo].insert!(
       %Cue.Schemas.Job{
         name: opts[:name],
-        handler: handler,
+        handler: opts[:handler],
         error_handler: opts[:error_handler],
         run_at: run_at,
         schedule: opts[:schedule],
@@ -72,7 +73,8 @@ defmodule Cue do
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       def enqueue! do
-        Cue.enqueue!(__MODULE__,
+        Cue.enqueue!(
+          handler: __MODULE__,
           name: @cue_name,
           error_handler: __MODULE__,
           schedule: unquote(schedule),
