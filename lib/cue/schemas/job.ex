@@ -7,13 +7,13 @@ defmodule Cue.Schemas.Job do
 
   schema "jobs" do
     field(:name, :string)
-    field(:handler, CryptoFundingTracker.Handler)
-    field(:error_handler, CryptoFundingTracker.Handler)
+    field(:handler, Cue.ElixirTerm)
+    field(:error_handler, Cue.ElixirTerm)
     field(:last_error, :string)
     field(:schedule, :string)
     field(:retry_count, :integer)
     field(:max_retries, :integer)
-    field(:context, :map)
+    field(:context, Cue.ElixirTerm)
     field(:last_succeeded_at, :utc_datetime_usec)
     field(:last_failed_at, :utc_datetime_usec)
     field(:run_at, :utc_datetime)

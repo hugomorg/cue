@@ -3,8 +3,15 @@ defmodule Cue do
   Documentation for `Cue`.
   """
 
-  @callback handle_job(any()) :: :ok | {:ok, map()} | {:error, any()}
-  @callback handle_job_error(any()) :: :ok | {:ok, map()} | {:error, any()}
+  @type name :: String.t()
+  @type context :: any()
+  @callback handle_job(name, context) :: :ok | {:ok, map()} | {:error, any()}
+  @type error_info :: %{
+          error: String.t(),
+          retry_count: non_neg_integer(),
+          max_retries: non_neg_integer()
+        }
+  @callback handle_job_error(name, context, error_info) :: :ok | {:ok, map()} | {:error, any()}
 
   def enqueue!(opts) do
     opts =
