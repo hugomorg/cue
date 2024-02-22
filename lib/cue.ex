@@ -5,6 +5,7 @@ defmodule Cue do
 
   @type name :: String.t()
   @type context :: any()
+  @callback init(name) :: {:ok, any()}
   @callback handle_job(name, context) :: :ok | {:ok, map()} | {:error, any()}
   @type error_info :: %{
           error: String.t(),
@@ -12,6 +13,10 @@ defmodule Cue do
           max_retries: non_neg_integer()
         }
   @callback handle_job_error(name, context, error_info) :: :ok | {:ok, map()} | {:error, any()}
+
+  @optional_callbacks [init: 1]
+
+  alias Cue.Schemas.Job
 
   def enqueue!(opts) do
     opts =
@@ -27,31 +32,31 @@ defmodule Cue do
         context: nil
       ])
 
-    handler = validate_job_handler!(opts[:handler])
+    handler = {module, _function} = validate_job_handler!(opts[:handler])
     error_handler = validate_error_handler!(opts[:error_handler])
+
+    context = init_job(opts[:name], module)
 
     run_at =
       if opts[:run_now] do
         DateTime.utc_now()
       else
-        Cue.Schemas.Job.next_run_at!(opts[:schedule])
+        Job.next_run_at!(opts[:schedule])
       end
 
-    opts[:repo].insert!(
-      %Cue.Schemas.Job{
-        name: opts[:name],
-        handler: handler,
-        error_handler: error_handler,
-        run_at: run_at,
-        schedule: opts[:schedule],
-        status: :not_started,
-        max_retries: opts[:max_retries],
-        one_off: opts[:one_off]
-      },
-      on_conflict: :nothing,
-      conflict_target: :name,
-      returning: true
-    )
+    %Job{}
+    |> Job.changeset(%{
+      name: opts[:name],
+      handler: handler,
+      error_handler: error_handler,
+      run_at: run_at,
+      schedule: opts[:schedule],
+      status: :not_started,
+      max_retries: opts[:max_retries],
+      one_off: opts[:one_off],
+      context: context
+    })
+    |> opts[:repo].insert!()
   end
 
   def dequeue(repo, job_name) do
@@ -62,7 +67,7 @@ defmodule Cue do
     Cue.Processor.remove_job(job_name)
 
     {count, _returned} =
-      Cue.Schemas.Job
+      Job
       |> Ecto.Query.where(name: ^job_name)
       |> repo.delete_all()
 
@@ -97,6 +102,18 @@ defmodule Cue do
       module_exists? and function_exported?(module, fun, arity) -> {module, fun}
       module_exists? -> raise "#{no_function_error.(module, fun)}"
       :else -> raise "#{no_module_error.(module)}"
+    end
+  end
+
+  defp init_job(name, module) do
+    if function_exported?(module, :init, 1) do
+      case module.init(name) do
+        {:ok, context} ->
+          context
+
+        unexpected_return ->
+          raise "You must return `{:ok, context}` from your `init/1` function, received #{inspect(unexpected_return)}"
+      end
     end
   end
 

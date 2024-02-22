@@ -26,6 +26,10 @@ defmodule Cue.Schemas.Job do
   def changeset(job, params) do
     job
     |> cast(params, [
+      :name,
+      :schedule,
+      :handler,
+      :error_handler,
       :status,
       :last_succeeded_at,
       :last_failed_at,
@@ -36,7 +40,7 @@ defmodule Cue.Schemas.Job do
       :max_retries,
       :one_off
     ])
-    |> validate_required([:status, :run_at])
+    |> validate_required([:status, :run_at, :name, :handler, :error_handler, :schedule])
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
   end
