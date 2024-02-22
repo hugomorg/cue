@@ -187,16 +187,12 @@ defmodule Cue.Processor do
     cond do
       module_exists? and function_exported?(module, fun, 1) -> {module, fun}
       module_exists? -> raise "#{inspect(fun)} is not defined"
-      :else -> "handler #{inspect(module)} not a module"
+      :else -> raise "handler #{inspect(module)} not a module"
     end
   end
 
   defp apply_handler({module, fun}, job) do
     apply(module, fun, [job])
-  end
-
-  defp apply_handler(handler, job) do
-    apply_handler({handler, :handle_job}, job)
   end
 
   defp maybe_apply_error_handler(job) do
