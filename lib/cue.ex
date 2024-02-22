@@ -16,7 +16,8 @@ defmodule Cue do
         :error_handler,
         run_now: false,
         one_off: false,
-        max_retries: nil
+        max_retries: nil,
+        context: nil
       ])
 
     run_at =
@@ -63,26 +64,22 @@ defmodule Cue do
   defmacro __using__(opts) do
     name = Keyword.get(opts, :name)
     schedule = Keyword.fetch!(opts, :schedule)
-    run_now = Keyword.get(opts, :run_now)
-    max_retries = Keyword.get(opts, :max_retries)
-    one_off = Keyword.get(opts, :one_off)
 
     quote do
       @behaviour Cue
       @repo Application.compile_env!(:cue, :repo)
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
-      def enqueue! do
-        Cue.enqueue!(
+      def enqueue!(opts \\ []) do
+        [
           handler: __MODULE__,
           name: @cue_name,
           error_handler: __MODULE__,
           schedule: unquote(schedule),
-          repo: @repo,
-          run_now: unquote(run_now),
-          max_retries: unquote(max_retries),
-          one_off: unquote(one_off)
-        )
+          repo: @repo
+        ]
+        |> Keyword.merge(opts)
+        |> Cue.enqueue!()
       end
 
       def dequeue do
