@@ -41,7 +41,7 @@ defmodule Cue.Scheduler do
   @impl true
   def handle_info(:check, state) do
     loop(:check, @check_every_seconds)
-    jobs = Job |> where([j], ^DateTime.utc_now() >= j.run_at) |> @repo.all()
+    jobs = Job |> where([j], ^DateTime.utc_now() >= j.run_at) |> order_by(:run_at) |> @repo.all()
 
     for job <- jobs, job.name not in state.ignore_jobs do
       Cue.Processor.process_job(job)
