@@ -9,22 +9,25 @@ defmodule Cue.Scheduler do
 
   @check_every_seconds 1
 
+  ## GenServer interface
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: Keyword.get(args, :name, __MODULE__))
   end
 
-  @impl true
-  def init(_args) do
-    loop(:check, @check_every_seconds)
-    {:ok, %{ignore_jobs: []}}
-  end
-
+  # We want to temporarily ignore certain jobs if they are getting dequeued
   def add_job_to_ignored(job_name) do
     GenServer.call(__MODULE__, {:add_job_to_ignored, job_name})
   end
 
   def remove_job_from_ignored(job_name) do
     GenServer.call(__MODULE__, {:remove_job_from_ignored, job_name})
+  end
+
+  ## GenServer callbacks
+  @impl true
+  def init(_args) do
+    loop(:check, @check_every_seconds)
+    {:ok, %{ignore_jobs: []}}
   end
 
   @impl true
@@ -50,6 +53,7 @@ defmodule Cue.Scheduler do
     {:noreply, state}
   end
 
+  ## Helpers
   defp loop(task, seconds) do
     Process.send_after(self(), task, :timer.seconds(seconds))
   end

@@ -23,7 +23,7 @@ defmodule Cue do
       if opts[:run_now] do
         DateTime.utc_now()
       else
-        Cue.Schemas.Job.next_run_at(opts[:schedule])
+        Cue.Schemas.Job.next_run_at!(opts[:schedule])
       end
 
     opts[:repo].insert!(

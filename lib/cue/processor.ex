@@ -7,16 +7,11 @@ defmodule Cue.Processor do
   alias Cue.Schemas.Job
   @repo Application.compile_env!(:cue, :repo)
 
+  ## GenServer interface
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: Keyword.get(args, :name, __MODULE__))
   end
 
-  @impl true
-  def init(_) do
-    {:ok, %{refs: %{}}}
-  end
-
-  # Processing logic
   def process_job(job) do
     GenServer.call(__MODULE__, {:start_task, nil, job})
   end
@@ -25,29 +20,29 @@ defmodule Cue.Processor do
     GenServer.call(__MODULE__, {:remove_task, name})
   end
 
+  ## GenServer callbacks
   @impl true
-  # In this case the task is already running, so we just return :ok.
+  def init(_) do
+    {:ok, %{refs: %{}}}
+  end
+
+  @impl true
+  # Job is already running
   def handle_call({:start_task, ref, _job}, _from, %{refs: refs} = state)
       when is_map_key(refs, ref) do
     {:reply, :ok, state}
   end
 
   @impl true
-  # The task is not running yet, so let's start it.
+  # Start processing job - not running
   def handle_call({:start_task, _ref, job}, _from, %{refs: refs} = state) do
     task =
       Task.Supervisor.async_nolink(Cue.TaskProcessor, fn ->
         handle_job(job)
       end)
 
-    # We return :ok and the server will continue running
     {:reply, :ok, %{state | refs: Map.put(refs, task.ref, %{task: task, job: job})}}
   end
-
-  # def handle_call(call, from, state) do
-  #   IO.inspect("call=#{inspect(call)}")
-  #   {:reply, :ok, state}
-  # end
 
   @impl true
   # In this case the task is already running, so we just return :ok.
@@ -55,11 +50,14 @@ defmodule Cue.Processor do
     refs =
       case Enum.find(refs, fn {_ref, %{job: job}} -> job.name == job_name end) do
         {ref, _value} ->
-          Logger.debug("#{job_name} removed from processing")
+          Logger.debug("Job #{job_name} removed from processor")
           Map.delete(refs, ref)
 
         nil ->
-          Logger.debug("no job found for #{job_name} to delete")
+          Logger.warning(
+            "Attempting to remove the task, but no job found for #{job_name} to delete"
+          )
+
           refs
       end
 
@@ -76,7 +74,8 @@ defmodule Cue.Processor do
 
   @impl true
   # The task completed successfully
-  def handle_info({ref, {:ok, _job}}, %{refs: refs} = state) do
+  def handle_info({ref, {:ok, job}}, %{refs: refs} = state) do
+    Logger.debug("Job #{job.name} was handled OK")
     Process.demonitor(ref, [:flush])
     {:noreply, %{state | refs: Map.delete(refs, ref)}}
   end
@@ -86,6 +85,7 @@ defmodule Cue.Processor do
       when is_map_key(refs, ref) do
     %{job: job} = refs[ref]
     # TODO: add retry logic here
+    Logger.error("Job #{job.name} failed error=#{inspect(error)}")
     update_job_as_failed!(job, error)
     maybe_apply_error_handler(job)
     Process.demonitor(ref, [:flush])
@@ -99,6 +99,7 @@ defmodule Cue.Processor do
     {:noreply, state}
   end
 
+  ## Processing logic
   def handle_job(job) do
     Logger.debug("handling job=#{inspect(job)}")
 
@@ -141,7 +142,7 @@ defmodule Cue.Processor do
     retry_count = job.retry_count + 1
 
     status =
-      if is_integer(job.max_retries) and retry_count >= job.max_retries do
+      if Job.retries_exceeded?(%Job{job | retry_count: retry_count}) do
         :paused
       else
         :failed
@@ -151,7 +152,7 @@ defmodule Cue.Processor do
     |> Job.changeset(%{
       last_failed_at: now,
       last_error: inspect(error),
-      run_at: Job.next_run_at(job),
+      run_at: Job.next_run_at!(job),
       retry_count: job.retry_count + 1,
       status: status
     })
@@ -167,7 +168,7 @@ defmodule Cue.Processor do
       job
       |> Job.changeset(%{
         last_succeeded_at: now,
-        run_at: Job.next_run_at(job),
+        run_at: Job.next_run_at!(job),
         context: context,
         retry_count: 0,
         status: :succeeded
