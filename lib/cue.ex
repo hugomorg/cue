@@ -27,7 +27,6 @@ defmodule Cue do
         :schedule,
         :error_handler,
         run_now: false,
-        one_off: false,
         max_retries: nil,
         context: nil
       ])
@@ -37,12 +36,7 @@ defmodule Cue do
 
     context = init_job(opts[:name], module)
 
-    run_at =
-      if opts[:run_now] do
-        DateTime.utc_now()
-      else
-        Job.next_run_at!(opts[:schedule])
-      end
+    {schedule, run_at} = validate_schedule!(opts[:schedule])
 
     %Job{}
     |> Job.changeset(%{
@@ -50,10 +44,9 @@ defmodule Cue do
       handler: handler,
       error_handler: error_handler,
       run_at: run_at,
-      schedule: opts[:schedule],
+      schedule: schedule,
       status: :not_started,
       max_retries: opts[:max_retries],
-      one_off: opts[:one_off],
       context: context
     })
     |> opts[:repo].insert!()
@@ -115,6 +108,18 @@ defmodule Cue do
           raise "You must return `{:ok, context}` from your `init/1` function, received #{inspect(unexpected_return)}"
       end
     end
+  end
+
+  defp validate_schedule!(schedule) when is_binary(schedule) do
+    {schedule, Job.next_run_at!(schedule)}
+  end
+
+  defp validate_schedule!(%DateTime{} = schedule) do
+    {nil, schedule}
+  end
+
+  defp validate_schedule!(schedule) do
+    raise "schedule must be a valid cron specification or a UTC datetime, received #{inspect(schedule)}"
   end
 
   defmacro __using__(opts) do

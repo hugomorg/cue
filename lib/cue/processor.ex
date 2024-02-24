@@ -161,19 +161,15 @@ defmodule Cue.Processor do
   defp update_job_as_success!(job, context) do
     now = DateTime.utc_now()
 
-    if job.one_off do
-      @repo.delete(job)
-    else
-      job
-      |> Job.changeset(%{
-        last_succeeded_at: now,
-        run_at: Job.next_run_at!(job),
-        context: context,
-        retry_count: 0,
-        status: :succeeded
-      })
-      |> @repo.update!
-    end
+    job
+    |> Job.changeset(%{
+      last_succeeded_at: now,
+      run_at: Job.next_run_at!(job),
+      context: context,
+      retry_count: 0,
+      status: :succeeded
+    })
+    |> @repo.update!
   end
 
   defp apply_handler({module, fun}, args) do
