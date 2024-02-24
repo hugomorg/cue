@@ -56,6 +56,6 @@ defmodule Cue.Schemas.Job do
   def retries_exceeded?(%__MODULE__{max_retries: nil}), do: false
 
   def retries_exceeded?(%__MODULE__{max_retries: max_retries, retry_count: retry_count}) do
-    retry_count >= max_retries
+    retry_count > max_retries
   end
 end

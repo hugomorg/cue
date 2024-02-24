@@ -124,6 +124,7 @@ defmodule Cue.Processor do
 
     case apply(job.handler, :handle_job, [job.name, job.context]) do
       {:error, error} ->
+        maybe_apply_error_handler(job)
         update_job_as_failed!(job, error)
 
       {:ok, context} ->
