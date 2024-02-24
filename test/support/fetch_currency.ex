@@ -4,7 +4,11 @@ defmodule Cue.FetchCurrency do
   require Logger
 
   def seed_fx_pairs do
-    for job <- [[name: "EUR-USD"], [name: "GBP-JPY"], [name: "AUD-SGD", max_retries: 3]] do
+    for job <- [
+          [name: "EUR-USD"],
+          [name: "GBP-JPY", max_retries: 2],
+          [name: "AUD-SGD", max_retries: 3]
+        ] do
       enqueue!(job)
     end
   end
@@ -12,7 +16,14 @@ defmodule Cue.FetchCurrency do
   @impl true
   def init(name) do
     [from_currency, to_currency] = String.split(name, "-", trim: true)
-    {:ok, %{from_currency: from_currency, to_currency: to_currency, rate: nil, time: DateTime.utc_now()}}
+
+    {:ok,
+     %{
+       from_currency: from_currency,
+       to_currency: to_currency,
+       rate: nil,
+       time: DateTime.utc_now()
+     }}
   end
 
   @impl true
@@ -45,7 +56,9 @@ defmodule Cue.FetchCurrency do
 
   @impl true
   def handle_job_error(name, context, error_info) do
-    Logger.error("Unexpected error name=#{name} context=#{inspect(context)} error_info=#{inspect(error_info, pretty: true, limit: :infinity)}")
+    Logger.error(
+      "Unexpected error name=#{name} context=#{inspect(context)} error_info=#{inspect(error_info, pretty: true, limit: :infinity)}"
+    )
 
     :ok
   end

@@ -1,6 +1,6 @@
 import Config
 
-config :logger, level: :debug
+config :logger, level: :info
 
 config :cue, ecto_repos: [Cue.TestRepo]
 
