@@ -25,16 +25,14 @@ defmodule Cue do
         :repo,
         :name,
         :schedule,
-        :error_handler,
         run_now: false,
         max_retries: nil,
         context: nil
       ])
 
-    handler = {module, _function} = validate_job_handler!(opts[:handler])
-    error_handler = validate_error_handler!(opts[:error_handler])
+    handler = validate_job_handler!(opts[:handler])
 
-    context = init_job(opts[:name], module)
+    context = init_job(opts[:name], handler)
 
     {schedule, run_at} = validate_schedule!(opts[:schedule])
 
@@ -42,7 +40,6 @@ defmodule Cue do
     |> Job.changeset(%{
       name: opts[:name],
       handler: handler,
-      error_handler: error_handler,
       run_at: run_at,
       schedule: schedule,
       status: :not_started,
@@ -50,6 +47,8 @@ defmodule Cue do
       context: context
     })
     |> opts[:repo].insert!()
+
+    opts[:name]
   end
 
   def dequeue(repo, job_name) do
@@ -70,31 +69,19 @@ defmodule Cue do
   end
 
   defp validate_job_handler!(handler) when is_atom(handler) do
-    validate_handler!(
-      {handler, :handle_job},
-      2,
-      &"Error handling module #{inspect(&1)} doesn't exist",
-      &"Function #{inspect(&2)} given as error handling function in module #{&1} but it doesn't exist"
-    )
-  end
-
-  defp validate_error_handler!(handler) do
-    validate_handler!(
-      {handler, :handle_job_error},
-      3,
-      &"Job handling module #{inspect(&1)} doesn't exist",
-      &"Function #{inspect(&2)} given as job handling function in module #{&1} but it doesn't exist"
-    )
-  end
-
-  defp validate_handler!({module, fun}, arity, no_module_error, no_function_error)
-       when is_atom(module) and is_atom(fun) do
-    module_exists? = Code.ensure_loaded?(module)
+    module_exists? = Code.ensure_loaded?(handler)
+    job_handler_defined? = function_exported?(handler, :handle_job, 2)
+    error_handler_defined? = function_exported?(handler, :handle_job_error, 3)
 
     cond do
-      module_exists? and function_exported?(module, fun, arity) -> {module, fun}
-      module_exists? -> raise "#{no_function_error.(module, fun)}"
-      :else -> raise "#{no_module_error.(module)}"
+      module_exists? and job_handler_defined? and error_handler_defined? ->
+        handler
+
+      module_exists? and job_handler_defined? ->
+        raise "Please define `handle_job_error/3` in #{inspect(handler)}"
+
+      :else ->
+        raise "Please define `handle_job/2` in #{inspect(handler)}"
     end
   end
 
@@ -135,7 +122,6 @@ defmodule Cue do
         [
           handler: __MODULE__,
           name: @cue_name,
-          error_handler: __MODULE__,
           schedule: unquote(schedule),
           repo: @repo
         ]
@@ -143,8 +129,8 @@ defmodule Cue do
         |> Cue.enqueue!()
       end
 
-      def dequeue do
-        Cue.dequeue(@repo, @cue_name)
+      def dequeue(name \\ @cue_name) do
+        Cue.dequeue(@repo, name)
       end
     end
   end

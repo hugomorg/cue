@@ -122,7 +122,7 @@ defmodule Cue.Processor do
   defp maybe_handle_job(changes) do
     job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
 
-    case apply_handler(job.handler, [job.name, job.context]) do
+    case apply(job.handler, :handle_job, [job.name, job.context]) do
       {:error, error} ->
         update_job_as_failed!(job, error)
 
@@ -172,12 +172,8 @@ defmodule Cue.Processor do
     |> @repo.update!
   end
 
-  defp apply_handler({module, fun}, args) do
-    apply(module, fun, args)
-  end
-
   defp maybe_apply_error_handler(job) do
-    apply_handler(job.error_handler, [
+    apply(job.handler, :handle_job_error, [
       job.name,
       job.context,
       %{error: job.last_error, retry_count: job.retry_count, max_retries: job.max_retries}
