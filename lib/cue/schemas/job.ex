@@ -12,7 +12,7 @@ defmodule Cue.Schemas.Job do
     field(:schedule, :string)
     field(:retry_count, :integer)
     field(:max_retries, :integer)
-    field(:context, Cue.ElixirTerm)
+    field(:state, Cue.ElixirTerm)
     field(:last_succeeded_at, :utc_datetime_usec)
     field(:last_failed_at, :utc_datetime_usec)
     field(:run_at, :utc_datetime)
@@ -33,7 +33,7 @@ defmodule Cue.Schemas.Job do
       :last_error,
       :run_at,
       :retry_count,
-      :context,
+      :state,
       :max_retries
     ])
     |> validate_required([:status, :run_at, :name, :handler])

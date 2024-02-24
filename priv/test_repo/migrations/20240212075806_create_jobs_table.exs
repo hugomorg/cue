@@ -9,7 +9,7 @@ defmodule Cue.TestRepo.Migrations.CreateJobsTable do
       add :run_at, :utc_datetime, null: false
       add :schedule, :string
       add :last_error, :text
-      add :context, :binary
+      add :state, :binary
       add :last_succeeded_at, :utc_datetime_usec
       add :last_failed_at, :utc_datetime_usec
       add :status, :smallint, null: false

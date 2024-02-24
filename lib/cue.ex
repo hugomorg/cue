@@ -4,15 +4,15 @@ defmodule Cue do
   """
 
   @type name :: String.t()
-  @type context :: any()
+  @type state :: any()
   @callback init(name) :: {:ok, any()}
-  @callback handle_job(name, context) :: :ok | {:ok, map()} | {:error, any()}
+  @callback handle_job(name, state) :: :ok | {:ok, map()} | {:error, any()}
   @type error_info :: %{
           error: String.t(),
           retry_count: non_neg_integer(),
           max_retries: non_neg_integer()
         }
-  @callback handle_job_error(name, context, error_info) :: :ok | {:ok, map()} | {:error, any()}
+  @callback handle_job_error(name, state, error_info) :: :ok | {:ok, map()} | {:error, any()}
 
   @optional_callbacks [init: 1]
 
@@ -27,12 +27,12 @@ defmodule Cue do
         :schedule,
         run_now: false,
         max_retries: nil,
-        context: nil
+        state: nil
       ])
 
     handler = validate_job_handler!(opts[:handler])
 
-    context = init_job(opts[:name], handler)
+    state = init_job(opts[:name], handler)
 
     {schedule, run_at} = validate_schedule!(opts[:schedule])
 
@@ -44,7 +44,7 @@ defmodule Cue do
       schedule: schedule,
       status: :not_started,
       max_retries: opts[:max_retries],
-      context: context
+      state: state
     })
     |> opts[:repo].insert!()
 
@@ -88,11 +88,11 @@ defmodule Cue do
   defp init_job(name, module) do
     if function_exported?(module, :init, 1) do
       case module.init(name) do
-        {:ok, context} ->
-          context
+        {:ok, state} ->
+          state
 
         unexpected_return ->
-          raise "You must return `{:ok, context}` from your `init/1` function, received #{inspect(unexpected_return)}"
+          raise "You must return `{:ok, state}` from your `init/1` function, received #{inspect(unexpected_return)}"
       end
     end
   end
