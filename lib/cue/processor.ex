@@ -4,7 +4,7 @@ defmodule Cue.Processor do
   use GenServer
   require Logger
   import Ecto.Query
-  alias Cue.Schemas.Job
+  alias Cue.Job
   @repo Application.compile_env!(:cue, :repo)
 
   ## GenServer interface

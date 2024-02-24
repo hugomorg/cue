@@ -1,11 +1,11 @@
-defmodule Cue.Schemas.Job do
+defmodule Cue.Job do
   use Ecto.Schema
   import Ecto.Changeset
 
   @timestamps_opts [type: :utc_datetime_usec]
   @status_values [not_started: 0, processing: 1, failed: 2, succeeded: 3, paused: 4]
 
-  schema "jobs" do
+  schema "cue_jobs" do
     field(:name, :string)
     field(:handler, Cue.ElixirTerm)
     field(:last_error, :string)

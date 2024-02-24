@@ -4,7 +4,7 @@ defmodule Cue.Scheduler do
   use GenServer
   require Logger
   import Ecto.Query
-  alias Cue.Schemas.Job
+  alias Cue.Job
   @repo Cue.TestRepo
 
   @check_every_seconds 1

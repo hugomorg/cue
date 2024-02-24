@@ -16,7 +16,7 @@ defmodule Cue do
 
   @optional_callbacks [init: 1]
 
-  alias Cue.Schemas.Job
+  alias Cue.Job
 
   def enqueue!(opts) do
     opts =

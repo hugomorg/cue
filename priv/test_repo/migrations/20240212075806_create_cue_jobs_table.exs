@@ -1,8 +1,8 @@
-defmodule Cue.TestRepo.Migrations.CreateJobsTable do
+defmodule Cue.TestRepo.Migrations.CreateCueJobsTable do
   use Ecto.Migration
 
   def change do
-    create table :jobs do
+    create table :cue_jobs do
       add :name, :string, null: false
       add :handler, :binary, null: false
       add :retry_count, :integer, default: 0, null: false
@@ -18,7 +18,7 @@ defmodule Cue.TestRepo.Migrations.CreateJobsTable do
       timestamps(updated_at: false)
     end
 
-    create unique_index(:jobs, :name)
-    create index(:jobs, :run_at)
+    create unique_index(:cue_jobs, :name)
+    create index(:cue_jobs, :run_at)
   end
 end
