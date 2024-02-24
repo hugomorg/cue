@@ -25,7 +25,6 @@ defmodule Cue do
         :repo,
         :name,
         :schedule,
-        run_now: false,
         max_retries: nil,
         state: nil
       ])
