@@ -55,7 +55,7 @@ defmodule Cue do
     %{name: job.name, run_at: job.run_at}
   end
 
-  @spec enqueue(keyword()) :: {:error, :job_exists | any()} | {:ok, enqueue_return}
+  @spec enqueue(keyword()) :: {:error, {atom(), String.t()}} | {:ok, enqueue_return}
   def enqueue(opts) do
     with {:ok, opts} <-
            Keyword.validate(opts, [
@@ -65,12 +65,10 @@ defmodule Cue do
              :schedule,
              max_retries: nil,
              state: nil
-           ]) do
-      handler = validate_job_handler!(opts[:handler])
-
+           ]),
+         {:ok, {schedule, run_at}} <- validate_schedule(opts[:schedule]),
+         {:ok, handler} <- validate_job_handler(opts[:handler]) do
       state = init_job(opts[:name], handler)
-
-      {schedule, run_at} = validate_schedule!(opts[:schedule])
 
       case %Job{}
            |> Job.changeset(%{
@@ -88,7 +86,7 @@ defmodule Cue do
 
         {:error,
          %{errors: [name: {_msg, [constraint: :unique, constraint_name: "cue_jobs_name_index"]}]}} ->
-          {:error, :job_exists}
+          {:error, {:job_exists, opts[:name]}}
       end
     end
   end
@@ -120,11 +118,32 @@ defmodule Cue do
         handler
 
       module_exists? and job_handler_defined? ->
-        raise "Please define `handle_job_error/3` in #{inspect(handler)}"
+        raise handle_job_error_error_message(handler)
 
       :else ->
-        raise "Please define `handle_job/2` in #{inspect(handler)}"
+        raise handle_job_error_message(handler)
     end
+  end
+
+  defp validate_job_handler(handler) when is_atom(handler) do
+    module_exists? = Code.ensure_loaded?(handler)
+    job_handler_defined? = function_exported?(handler, :handle_job, 2)
+    error_handler_defined? = function_exported?(handler, :handle_job_error, 3)
+
+    cond do
+      module_exists? and job_handler_defined? and error_handler_defined? ->
+        {:ok, handler}
+
+      module_exists? and job_handler_defined? ->
+        {:error, {:invalid_handler, handle_job_error_error_message(handler)}}
+
+      :else ->
+        {:error, {:invalid_handler, handle_job_error_message(handler)}}
+    end
+  end
+
+  defp validate_job_handler(_handler) do
+    {:error, {:invalid_handler, "Handler must be an atom"}}
   end
 
   defp init_job(name, module) do
@@ -148,7 +167,40 @@ defmodule Cue do
   end
 
   defp validate_schedule!(schedule) do
-    raise "schedule must be a valid cron specification or a UTC datetime, received #{inspect(schedule)}"
+    raise schedule_error_message(schedule)
+  end
+
+  defp validate_schedule(schedule) when is_binary(schedule) do
+    case Job.next_run_at(schedule) do
+      {:ok, next_run_at} ->
+        {:ok, {schedule, next_run_at}}
+
+      :error ->
+        {:error, {:invalid_schedule, schedule_error_message(schedule)}}
+
+      error ->
+        error
+    end
+  end
+
+  defp validate_schedule(%DateTime{} = schedule) do
+    {:ok, {nil, schedule}}
+  end
+
+  defp validate_schedule(schedule) do
+    {:error, {:invalid_schedule, schedule_error_message(schedule)}}
+  end
+
+  defp schedule_error_message(schedule) do
+    "Schedule must be a valid cron specification or a UTC datetime, received #{inspect(schedule)}"
+  end
+
+  defp handle_job_error_error_message(handler) do
+    "Please define `handle_job_error/3` in #{inspect(handler)}"
+  end
+
+  defp handle_job_error_message(handler) do
+    "Please define `handle_job/2` in #{inspect(handler)}"
   end
 
   defmacro __using__(opts) do

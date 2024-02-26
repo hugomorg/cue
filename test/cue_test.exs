@@ -148,7 +148,19 @@ defmodule CueTest do
 
     test "returns error if job exists" do
       Example.enqueue()
-      assert Example.enqueue() == {:error, :job_exists}
+      assert Example.enqueue() == {:error, {:job_exists, "CueTest.Example"}}
+    end
+
+    test "returns error if cron invalid" do
+      assert {:error, {:invalid_schedule, _msg}} = Example.enqueue(schedule: "* * *")
+    end
+
+    test "returns error if schedule invalid" do
+      assert {:error, {:invalid_schedule, _msg}} = Example.enqueue(schedule: 2)
+    end
+
+    test "returns error if handler invalid" do
+      assert {:error, {:invalid_handler, _msg}} = Example.enqueue(handler: :yo)
     end
   end
 
