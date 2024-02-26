@@ -39,6 +39,7 @@ defmodule Cue.Job do
     |> validate_required([:status, :run_at, :name, :handler])
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
+    |> unique_constraint(:name)
   end
 
   def next_run_at!(%__MODULE__{schedule: nil, run_at: run_at}) do

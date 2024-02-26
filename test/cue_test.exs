@@ -130,4 +130,25 @@ defmodule CueTest do
       assert Agent.get(CueTest, &Function.identity/1) == @name_to_trigger_crash
     end
   end
+
+  describe "enqueue/1" do
+    test "successfully inserts job into table - assumed module defaults" do
+      assert Example.enqueue() == {:ok, "CueTest.Example"}
+      assert job = @repo.one!(Job)
+      assert job.name == "CueTest.Example"
+      assert job.state == %{id: 0}
+      assert job.handler == CueTest.Example
+      refute job.last_error
+      assert job.schedule == "* * * * * *"
+      assert DateTime.compare(job.run_at, DateTime.utc_now()) == :gt
+      refute job.last_succeeded_at
+      refute job.last_failed_at
+      assert job.status == :not_started
+    end
+
+    test "returns error if job exists" do
+      assert Example.enqueue() == {:ok, "CueTest.Example"}
+      assert Example.enqueue() == {:error, :job_exists}
+    end
+  end
 end

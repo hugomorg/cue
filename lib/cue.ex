@@ -50,6 +50,43 @@ defmodule Cue do
     opts[:name]
   end
 
+  def enqueue(opts) do
+    with {:ok, opts} <-
+           Keyword.validate(opts, [
+             :handler,
+             :repo,
+             :name,
+             :schedule,
+             max_retries: nil,
+             state: nil
+           ]) do
+      handler = validate_job_handler!(opts[:handler])
+
+      state = init_job(opts[:name], handler)
+
+      {schedule, run_at} = validate_schedule!(opts[:schedule])
+
+      case %Job{}
+           |> Job.changeset(%{
+             name: opts[:name],
+             handler: handler,
+             run_at: run_at,
+             schedule: schedule,
+             status: :not_started,
+             max_retries: opts[:max_retries],
+             state: state
+           })
+           |> opts[:repo].insert() do
+        {:ok, job} ->
+          {:ok, job.name}
+
+        {:error,
+         %{errors: [name: {_msg, [constraint: :unique, constraint_name: "cue_jobs_name_index"]}]}} ->
+          {:error, :job_exists}
+      end
+    end
+  end
+
   def dequeue(repo, job_name) do
     require Ecto.Query
 
@@ -125,6 +162,17 @@ defmodule Cue do
         ]
         |> Keyword.merge(opts)
         |> Cue.enqueue!()
+      end
+
+      def enqueue(opts \\ []) do
+        [
+          handler: __MODULE__,
+          name: @cue_name,
+          schedule: unquote(schedule),
+          repo: @repo
+        ]
+        |> Keyword.merge(opts)
+        |> Cue.enqueue()
       end
 
       def dequeue(name \\ @cue_name) do
