@@ -47,7 +47,7 @@ defmodule CueTest do
 
   describe "enqueue!/1" do
     test "successfully inserts job into table - assumed module defaults" do
-      assert Example.enqueue!() == "CueTest.Example"
+      assert %{name: "CueTest.Example", run_at: %DateTime{}} = Example.enqueue!()
       assert job = @repo.one!(Job)
       assert job.name == "CueTest.Example"
       assert job.state == %{id: 0}
@@ -133,7 +133,7 @@ defmodule CueTest do
 
   describe "enqueue/1" do
     test "successfully inserts job into table - assumed module defaults" do
-      assert Example.enqueue() == {:ok, "CueTest.Example"}
+      assert {:ok, %{name: "CueTest.Example", run_at: %DateTime{}}} = Example.enqueue()
       assert job = @repo.one!(Job)
       assert job.name == "CueTest.Example"
       assert job.state == %{id: 0}
@@ -147,7 +147,7 @@ defmodule CueTest do
     end
 
     test "returns error if job exists" do
-      assert Example.enqueue() == {:ok, "CueTest.Example"}
+      Example.enqueue()
       assert Example.enqueue() == {:error, :job_exists}
     end
   end

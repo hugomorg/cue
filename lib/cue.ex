@@ -35,19 +35,20 @@ defmodule Cue do
 
     {schedule, run_at} = validate_schedule!(opts[:schedule])
 
-    %Job{}
-    |> Job.changeset(%{
-      name: opts[:name],
-      handler: handler,
-      run_at: run_at,
-      schedule: schedule,
-      status: :not_started,
-      max_retries: opts[:max_retries],
-      state: state
-    })
-    |> opts[:repo].insert!()
+    job =
+      %Job{}
+      |> Job.changeset(%{
+        name: opts[:name],
+        handler: handler,
+        run_at: run_at,
+        schedule: schedule,
+        status: :not_started,
+        max_retries: opts[:max_retries],
+        state: state
+      })
+      |> opts[:repo].insert!()
 
-    opts[:name]
+    %{name: job.name, run_at: job.run_at}
   end
 
   def enqueue(opts) do
@@ -78,7 +79,7 @@ defmodule Cue do
            })
            |> opts[:repo].insert() do
         {:ok, job} ->
-          {:ok, job.name}
+          {:ok, %{name: job.name, run_at: job.run_at}}
 
         {:error,
          %{errors: [name: {_msg, [constraint: :unique, constraint_name: "cue_jobs_name_index"]}]}} ->
