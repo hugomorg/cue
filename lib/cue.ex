@@ -16,8 +16,12 @@ defmodule Cue do
 
   @optional_callbacks [init: 1]
 
+  @type run_at :: DateTime.t()
+  @type enqueue_return :: %{name: name, run_at: run_at}
+
   alias Cue.Job
 
+  @spec enqueue!(keyword()) :: enqueue_return
   def enqueue!(opts) do
     opts =
       Keyword.validate!(opts, [
@@ -51,6 +55,7 @@ defmodule Cue do
     %{name: job.name, run_at: job.run_at}
   end
 
+  @spec enqueue(keyword()) :: {:error, :job_exists | any()} | {:ok, enqueue_return}
   def enqueue(opts) do
     with {:ok, opts} <-
            Keyword.validate(opts, [
@@ -88,6 +93,7 @@ defmodule Cue do
     end
   end
 
+  @spec dequeue(atom(), name()) :: non_neg_integer()
   def dequeue(repo, job_name) do
     require Ecto.Query
 
