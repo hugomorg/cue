@@ -5,12 +5,14 @@ defmodule Cue.Processor do
   import Ecto.Query
   alias Cue.Job
   @repo Application.compile_env!(:cue, :repo)
+  @max_concurrency Application.compile_env(:cue, :max_concurrency, 10)
+  @timeout Application.compile_env(:cue, :max_concurrency, 5000)
 
   def process_jobs(jobs) do
     Cue.TaskProcessor
     |> Task.Supervisor.async_stream_nolink(jobs, &handle_job/1,
-      max_concurrency: 10,
-      timeout: 10_000,
+      max_concurrency: @max_concurrency,
+      timeout: @timeout,
       on_timeout: :kill_task,
       zip_input_on_exit: true
     )
