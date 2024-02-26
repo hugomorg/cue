@@ -46,7 +46,11 @@ defmodule Cue.Processor do
     case apply(job.handler, :handle_job, [job.name, job.state]) do
       {:error, error} ->
         maybe_apply_error_handler(job)
-        update_job_as_failed!(job, error)
+        update_job_as_failed!(job, job.state, error)
+
+      {:error, error, state} ->
+        maybe_apply_error_handler(job)
+        update_job_as_failed!(job, state, error)
 
       {:ok, state} ->
         update_job_as_success!(job, state)
@@ -58,24 +62,31 @@ defmodule Cue.Processor do
     {:ok, job}
   end
 
-  defp update_job_as_failed!(job, error) do
+  defp update_job_as_failed!(job, state, error) do
     now = DateTime.utc_now()
-    retry_count = job.retry_count + 1
 
-    status =
-      if Job.retries_exceeded?(%Job{job | retry_count: retry_count}) do
-        :paused
+    {status, retry_count} =
+      if Job.retries_exceeded?(job) do
+        {:paused, job.retry_count}
       else
-        :failed
+        {:failed, job.retry_count + 1}
+      end
+
+    last_error =
+      if is_binary(error) do
+        error
+      else
+        inspect(error)
       end
 
     job
     |> Job.changeset(%{
       last_failed_at: now,
-      last_error: inspect(error),
+      last_error: last_error,
       run_at: Job.next_run_at!(job),
-      retry_count: job.retry_count + 1,
-      status: status
+      retry_count: retry_count,
+      status: status,
+      state: state
     })
     |> @repo.update!
   end
@@ -106,7 +117,7 @@ defmodule Cue.Processor do
     Enum.each(failed_jobs, fn {:exit, {job, error}} ->
       Logger.warning("job=#{job.id} crashed, error=#{inspect(error)}")
       maybe_apply_error_handler(job)
-      update_job_as_failed!(job, error)
+      update_job_as_failed!(job, job.state, error)
     end)
   end
 end
