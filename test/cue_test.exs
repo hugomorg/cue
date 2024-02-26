@@ -151,4 +151,20 @@ defmodule CueTest do
       assert Example.enqueue() == {:error, :job_exists}
     end
   end
+
+  describe "dequeue/2" do
+    test "by default dequeues assumed job" do
+      Example.enqueue!()
+      assert @repo.exists?(Job)
+      Example.dequeue()
+      refute @repo.exists?(Job)
+    end
+
+    test "by default dequeues with given name" do
+      Example.enqueue!(name: @name_to_trigger_success)
+      assert @repo.exists?(Job)
+      Example.dequeue(@name_to_trigger_success)
+      refute @repo.exists?(Job)
+    end
+  end
 end
