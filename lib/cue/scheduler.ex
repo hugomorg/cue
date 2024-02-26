@@ -45,17 +45,14 @@ defmodule Cue.Scheduler do
   def handle_info(:check, state) do
     loop(:check, @check_every_seconds)
 
-    jobs =
       Job
       |> where([j], ^DateTime.utc_now() >= j.run_at)
       # for one-off jobs
       |> where([j], not is_nil(j.schedule) or j.status == :not_started)
       |> order_by(:run_at)
       |> @repo.all()
-
-    for job <- jobs, job.name not in state.ignore_jobs do
-      Cue.Processor.process_job(job)
-    end
+      |> Enum.filter(& &1.name not in state.ignore_jobs)
+      |> Cue.Processor.process_jobs
 
     {:noreply, state}
   end

@@ -55,7 +55,6 @@ defmodule Cue do
 
     # Synchronously remove job from scheduling/processing
     Cue.Scheduler.add_job_to_ignored(job_name)
-    Cue.Processor.remove_job(job_name)
 
     {count, _returned} =
       Job
