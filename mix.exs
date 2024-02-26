@@ -25,7 +25,7 @@ defmodule Cue.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.10"},
-      {:postgrex, "~> 0.17", only: [:test]},
+      {:postgrex, "~> 0.17", only: [:test, :dev]},
       {:jason, "~> 1.4"},
       {:cron, "~> 0.1"}
     ]
@@ -35,6 +35,6 @@ defmodule Cue.MixProject do
     [test: ["ecto.drop", "ecto.create --quiet", "ecto.migrate", "test"]]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 end

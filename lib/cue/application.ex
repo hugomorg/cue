@@ -7,25 +7,22 @@ defmodule Cue.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [{Task.Supervisor, name: Cue.TaskProcessor}]
-
-    children =
-      if Application.get_env(:cue, :no_schedule) do
-        children
-      else
-        children ++ [Cue.Scheduler]
-      end
-
-    children =
-      if Mix.env() == :test do
-        [Cue.TestRepo] ++ children
-      else
-        children
-      end
+    children = [{Task.Supervisor, name: Cue.TaskProcessor}, Cue.Scheduler]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Cue.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    children
+    |> maybe_start_test_repo(Mix.env())
+    |> Supervisor.start_link(opts)
+  end
+
+  defp maybe_start_test_repo(children, env) when env in [:dev, :test] do
+    [Cue.TestRepo] ++ children
+  end
+
+  defp maybe_start_test_repo(children, _env) do
+    children
   end
 end
