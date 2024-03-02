@@ -45,6 +45,22 @@ defmodule CueTest do
     end
   end
 
+  defmodule Example2 do
+    use Cue
+
+    def handle_job("fail", _state) do
+      {:error, :fail}
+    end
+
+    def handle_job(_name, _state) do
+      :ok
+    end
+
+    def handle_job_error(_name, _state, _error_info) do
+      :ok
+    end
+  end
+
   describe "enqueue!/1" do
     test "successfully inserts job into table - assumed module defaults" do
       assert %{name: "CueTest.Example", run_at: %DateTime{}} = Example.enqueue!()
@@ -128,6 +144,31 @@ defmodule CueTest do
       assert job.status == :failed
       refute job.last_succeeded_at
       assert Agent.get(CueTest, &Function.identity/1) == @name_to_trigger_crash
+    end
+
+    test "schedule doesn't need to be defined at module" do
+      assert Example2.enqueue!(schedule: DateTime.utc_now())
+    end
+
+    test "one-off jobs are not retried" do
+      assert Example2.enqueue!(schedule: DateTime.utc_now(), name: "fail")
+      @repo.one!(Job)
+      :timer.sleep(1000)
+      assert @repo.one!(Job).retry_count == 0
+    end
+
+    test "one-off jobs are removed after running if autoremove is true" do
+      assert Example2.enqueue!(schedule: DateTime.utc_now(), autoremove: true)
+      @repo.one!(Job)
+      :timer.sleep(1000)
+      refute @repo.exists?(Job)
+    end
+
+    test "scheduled jobs are not removed even if autoremove is true" do
+      assert Example2.enqueue!(schedule: "* * * * * *", autoremove: true)
+      @repo.one!(Job)
+      :timer.sleep(1000)
+      assert @repo.exists?(Job)
     end
   end
 

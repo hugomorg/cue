@@ -1,6 +1,9 @@
 defmodule Cue do
   @moduledoc """
-  Documentation for `Cue`.
+  Cue helps you "queue" up, schedule and run tasks.
+
+  Please see README.md for more information.
+  ```
   """
 
   @type name :: String.t()
@@ -19,19 +22,21 @@ defmodule Cue do
   @type run_at :: DateTime.t()
   @type enqueue_return :: %{name: name, run_at: run_at}
 
+  @opts [
+    :handler,
+    :repo,
+    :name,
+    :schedule,
+    :autoremove,
+    max_retries: nil,
+    state: nil
+  ]
+
   alias Cue.Job
 
   @spec enqueue!(keyword()) :: enqueue_return
   def enqueue!(opts) do
-    opts =
-      Keyword.validate!(opts, [
-        :handler,
-        :repo,
-        :name,
-        :schedule,
-        max_retries: nil,
-        state: nil
-      ])
+    opts = Keyword.validate!(opts, @opts)
 
     handler = validate_job_handler!(opts[:handler])
 
@@ -48,7 +53,8 @@ defmodule Cue do
         schedule: schedule,
         status: :not_started,
         max_retries: opts[:max_retries],
-        state: state
+        state: state,
+        autoremove: opts[:autoremove]
       })
       |> opts[:repo].insert!()
 
@@ -57,15 +63,7 @@ defmodule Cue do
 
   @spec enqueue(keyword()) :: {:error, {atom(), String.t()}} | {:ok, enqueue_return}
   def enqueue(opts) do
-    with {:ok, opts} <-
-           Keyword.validate(opts, [
-             :handler,
-             :repo,
-             :name,
-             :schedule,
-             max_retries: nil,
-             state: nil
-           ]),
+    with {:ok, opts} <- Keyword.validate(opts, @opts),
          {:ok, {schedule, run_at}} <- validate_schedule(opts[:schedule]),
          {:ok, handler} <- validate_job_handler(opts[:handler]) do
       state = init_job(opts[:name], handler)
@@ -78,6 +76,7 @@ defmodule Cue do
              schedule: schedule,
              status: :not_started,
              max_retries: opts[:max_retries],
+             autoremove: opts[:autoremove],
              state: state
            })
            |> opts[:repo].insert() do
@@ -205,7 +204,8 @@ defmodule Cue do
 
   defmacro __using__(opts) do
     name = Keyword.get(opts, :name)
-    schedule = Keyword.fetch!(opts, :schedule)
+    schedule = Keyword.get(opts, :schedule)
+    autoremove = Keyword.get(opts, :autoremove, false)
 
     quote do
       @behaviour Cue
@@ -217,7 +217,8 @@ defmodule Cue do
           handler: __MODULE__,
           name: @cue_name,
           schedule: unquote(schedule),
-          repo: @repo
+          repo: @repo,
+          autoremove: unquote(autoremove)
         ]
         |> Keyword.merge(opts)
         |> Cue.enqueue!()
@@ -228,7 +229,8 @@ defmodule Cue do
           handler: __MODULE__,
           name: @cue_name,
           schedule: unquote(schedule),
-          repo: @repo
+          repo: @repo,
+          autoremove: unquote(autoremove)
         ]
         |> Keyword.merge(opts)
         |> Cue.enqueue()

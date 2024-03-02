@@ -17,6 +17,7 @@ defmodule Cue.Job do
     field(:last_failed_at, :utc_datetime_usec)
     field(:run_at, :utc_datetime)
     field(:status, Ecto.Enum, values: @status_values)
+    field(:autoremove, :boolean, default: false)
 
     timestamps(updated_at: false)
   end
@@ -34,9 +35,10 @@ defmodule Cue.Job do
       :run_at,
       :retry_count,
       :state,
-      :max_retries
+      :max_retries,
+      :autoremove
     ])
-    |> validate_required([:status, :run_at, :name, :handler])
+    |> validate_required([:status, :run_at, :name, :handler, :autoremove])
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
     |> unique_constraint(:name)
@@ -68,9 +70,16 @@ defmodule Cue.Job do
     end
   end
 
+  def one_off?(%__MODULE__{schedule: nil}), do: true
+  def one_off?(%__MODULE__{}), do: false
+
   def retries_exceeded?(%__MODULE__{max_retries: nil}), do: false
 
   def retries_exceeded?(%__MODULE__{max_retries: max_retries, retry_count: retry_count}) do
     retry_count >= max_retries
+  end
+
+  def remove?(job = %__MODULE__{}) do
+    one_off?(job) and job.autoremove
   end
 end

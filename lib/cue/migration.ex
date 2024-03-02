@@ -16,6 +16,7 @@ defmodule Cue.Migration do
           add(:last_failed_at, :utc_datetime_usec)
           add(:status, :smallint, null: false)
           add(:max_retries, :int)
+          add(:autoremove, :boolean, default: false, null: false)
 
           timestamps(updated_at: false)
         end

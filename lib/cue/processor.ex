@@ -33,6 +33,9 @@ defmodule Cue.Processor do
              |> lock("FOR UPDATE SKIP LOCKED")
            )
            |> Ecto.Multi.run(:job, fn _repo, changes -> maybe_handle_job(changes) end)
+           |> Ecto.Multi.run(:maybe_delete_job, fn _repo, changes ->
+             maybe_delete_job(changes.job)
+           end)
            |> @repo.transaction() do
       {:ok, job}
     end
@@ -43,33 +46,38 @@ defmodule Cue.Processor do
   defp maybe_handle_job(changes) do
     job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
 
-    case apply(job.handler, :handle_job, [job.name, job.state]) do
-      {:error, error} ->
-        maybe_apply_error_handler(job)
-        update_job_as_failed!(job, job.state, error)
+    job =
+      case apply(job.handler, :handle_job, [job.name, job.state]) do
+        {:error, error} ->
+          maybe_apply_error_handler(job)
+          update_job_as_failed!(job, job.state, error)
 
-      {:error, error, state} ->
-        maybe_apply_error_handler(job)
-        update_job_as_failed!(job, state, error)
+        {:error, error, state} ->
+          maybe_apply_error_handler(job)
+          update_job_as_failed!(job, state, error)
 
-      {:ok, state} ->
-        update_job_as_success!(job, state)
+        {:ok, state} ->
+          update_job_as_success!(job, state)
 
-      :ok ->
-        update_job_as_success!(job, job.state)
-    end
+        :ok ->
+          update_job_as_success!(job, job.state)
+      end
 
     {:ok, job}
+  end
+
+  defp maybe_delete_job(job = %Job{}) do
+    {:ok, Job.remove?(job) and !!@repo.delete!(job)}
   end
 
   defp update_job_as_failed!(job, state, error) do
     now = DateTime.utc_now()
 
     {status, retry_count} =
-      if Job.retries_exceeded?(job) do
-        {:paused, job.retry_count}
-      else
-        {:failed, job.retry_count + 1}
+      cond do
+        Job.one_off?(job) -> {:failed, job.retry_count}
+        Job.retries_exceeded?(job) -> {:paused, job.retry_count}
+        :else -> {:failed, job.retry_count + 1}
       end
 
     last_error =
