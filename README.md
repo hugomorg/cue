@@ -1,6 +1,6 @@
 # Cue
 
-Cue helps you schedule and run jobs. It uses Postgres as a database backend and assumes you are using `ecto`.
+Cue helps you schedule and run jobs. It uses Postgres as a database backend and assumes you are using [`ecto`](https://hexdocs.pm/ecto/Ecto.html).
 
 The first thing you need to do is run a migration with `ecto.gen.migration` so that we can persist the jobs. You can name this migration whatever you wish.
 
@@ -12,9 +12,15 @@ defmodule YourApp.CreateCueJobsTable do
 end
 ```
 
+You will need specify your `Repo` module:
+
+```elixir
+config :cue, repo: MyApp.Repo
+```
+
 The next step is scoping the job to a module. As a concrete example, let's assume you have a weather app which needs the latest weather. You want to be quite up-to-date so you decide to call it every minute. In other words, you want to run a job which is scheduled to repeat every minute.
 
-A schedule can be either a cron specification or a UTC `DateTime` value (see more below).
+A schedule can be either a [cron specification](https://crontab.guru/) or a UTC `DateTime` value (see more below).
 
 You can use `cue` like this:
 
@@ -82,19 +88,19 @@ Ok, so now we know how to schedule jobs. But what about one-off jobs? If the wea
 
 Simply pass a UTC `DateTime` as the `schedule` in `enqueue!/1`/`enqueue/1`. If you want the job to run immediately you can do something like `enqueue!(schedule: DateTime.utc_now())` (don't worry if it is slightly in the past, it will still run immediately).
 
-If you want the job to be cleaned up regardless of status, specify `autoremove: true`. This does not apply to scheduled jobs.
+If you want the job to be cleaned up regardless of status, set `autoremove` to `true`, either in `enqueue!/1`/`enqueue/1` or at the module level. This does not apply to scheduled jobs.
 
 ## Keeping context / state
 
 OK, next problem. You are fetching the weather every minute, and you want to keep the last prediction to detect a change.
 
-In other words, you want to keep "context" or "state". Doing this with `cue` is simply. Just return `{:ok, state}` from the job handler. The handler will receive the latest state.
+In other words, you want to keep "context" or "state". Doing this with `cue` is simple. Just return `{:ok, state}` from the job handler. The handler will receive the latest state on the next run.
 
-If you want to avoid a `nil` state on the first `handle_job/2` call or have some expensive setup, just define a callback `init/1` in your module. This will get called with the `name` of the job. It gets run once, when the job is created, and is used to initialise the state.
+If you want to avoid a `nil` state on the first `handle_job/2` call or have some expensive setup, just define a callback `init/1` in your module. This will get called with the `name` of the job. It gets run once, when the job is created, and is used to initialise the state for that particular job.
 
-`init/1` should return the state which then gets passed into each `handle_job/2` call. If you return `{:ok, new_state}` then the new state will get passed into the next call and so on.
+So the return value from `init/1` gets passed into the first `handle_job/2` call.
 
-`state` can be any Elixir expression.
+`state` can be any Elixir expression. Obviously if you are limited in terms of disk or memory or just have a lot of jobs you may want to be careful about storing too much here.
 
 ```elixir
 defmodule YourApp do
@@ -107,6 +113,7 @@ defmodule YourApp do
 
   @impl true
   def handle_job(name, state) do
+    # Compare current weather to past weather here...
     {:ok, %{state | latest_weather: WeatherAPI.list()}}
   end
 
@@ -150,6 +157,17 @@ defmodule YourApp do
     :ok
   end
 end
+```
+
+## Concurrency and timeouts
+
+Under the hood, each job is run as an Elixir [`Task`](https://hexdocs.pm/elixir/Task.html). You can specify the timeout in your config (in milliseconds). Default is 5000 ms, or 5 seconds.
+
+Concurrency is also configurable with `max_concurrency`. This is important to consider in case you have a lot of jobs scheduled to run at the same time, but your database connections are relatively limited. In such a case, you might want to start it with a small number, and increase it. The default is `5`.
+
+```elixir
+# Changing the defaults
+config :cue, timeout: 10_000, max_concurrency: 10
 ```
 
 ## Installation
