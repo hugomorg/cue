@@ -70,6 +70,10 @@ defmodule Cue.Processor do
     {:ok, Job.remove?(job) and !!@repo.delete!(job)}
   end
 
+  defp maybe_delete_job(:locked) do
+    {:ok, :locked}
+  end
+
   defp update_job_as_failed!(job, state, error) do
     now = DateTime.utc_now()
 

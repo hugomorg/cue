@@ -206,6 +206,7 @@ defmodule Cue do
     name = Keyword.get(opts, :name)
     schedule = Keyword.get(opts, :schedule)
     autoremove = Keyword.get(opts, :autoremove, false)
+    max_retries = Keyword.get(opts, :max_retries)
 
     quote do
       @behaviour Cue
@@ -218,7 +219,8 @@ defmodule Cue do
           name: @cue_name,
           schedule: unquote(schedule),
           repo: @repo,
-          autoremove: unquote(autoremove)
+          autoremove: unquote(autoremove),
+          max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
         |> Cue.enqueue!()
@@ -230,7 +232,8 @@ defmodule Cue do
           name: @cue_name,
           schedule: unquote(schedule),
           repo: @repo,
-          autoremove: unquote(autoremove)
+          autoremove: unquote(autoremove),
+          max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
         |> Cue.enqueue()
