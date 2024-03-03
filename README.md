@@ -12,6 +12,8 @@ defmodule YourApp.CreateCueJobsTable do
 end
 ```
 
+Don't forget to run `mix ecto.migrate`!
+
 You will need specify your `Repo` module:
 
 ```elixir
