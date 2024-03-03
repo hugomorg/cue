@@ -18,6 +18,22 @@ You will need specify your `Repo` module:
 config :cue, repo: MyApp.Repo
 ```
 
+You will also want to start `Cue` under your supervision tree, after the `Repo` you just specified. For example:
+
+```elixir
+defmodule YourApp.Application do
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    children = [YourApp.Repo, Cue]
+
+    opts = [strategy: :one_for_one, name: YourApp.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+end
+```
+
 The next step is scoping the job to a module. As a concrete example, let's assume you have a weather app which needs the latest weather. You want to be quite up-to-date so you decide to call it every minute. In other words, you want to run a job which is scheduled to repeat every minute.
 
 A schedule can be either a [cron specification](https://crontab.guru/) or a UTC `DateTime` value (see more below).
