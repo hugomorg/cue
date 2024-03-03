@@ -107,6 +107,28 @@ defmodule Cue do
     count
   end
 
+  def list_jobs(repo) do
+    require Ecto.Query
+
+    Job
+    |> Ecto.Query.order_by(desc: :run_at)
+    |> Ecto.Query.select([j], %{
+      run_at: j.run_at,
+      retry_count: j.retry_count,
+      last_failed_at: j.last_failed_at,
+      last_succeeded_at: j.last_succeeded_at,
+      last_error: j.last_error,
+      max_retries: j.max_retries,
+      autoremove: j.autoremove,
+      state: j.state,
+      status: j.status,
+      schedule: j.schedule,
+      handler: j.handler,
+      name: j.name
+    })
+    |> repo.all()
+  end
+
   defp validate_job_handler!(handler) when is_atom(handler) do
     module_exists? = Code.ensure_loaded?(handler)
     job_handler_defined? = function_exported?(handler, :handle_job, 2)
