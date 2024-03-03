@@ -33,7 +33,8 @@ defmodule Cue.MixProject do
       {:ecto_sql, "~> 3.10"},
       {:postgrex, "~> 0.17", only: [:test, :dev]},
       {:jason, "~> 1.4"},
-      {:cron, "~> 0.1"}
+      {:cron, "~> 0.1"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 
