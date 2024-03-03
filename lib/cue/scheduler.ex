@@ -14,7 +14,7 @@ defmodule Cue.Scheduler do
     GenServer.start_link(__MODULE__, args, name: Keyword.get(args, :name, __MODULE__))
   end
 
-  # We want to temporarily ignore certain jobs if they are getting dequeued
+  # We want to temporarily ignore certain jobs if they are getting removed
   def add_job_to_ignored(job_name) do
     GenServer.call(__MODULE__, {:add_job_to_ignored, job_name})
   end

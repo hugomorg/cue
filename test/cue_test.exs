@@ -205,18 +205,18 @@ defmodule CueTest do
     end
   end
 
-  describe "dequeue/2" do
-    test "by default dequeues assumed job" do
+  describe "remove/2" do
+    test "by default removes assumed job" do
       Example.enqueue!()
       assert @repo.exists?(Job)
-      Example.dequeue()
+      Example.remove()
       refute @repo.exists?(Job)
     end
 
-    test "by default dequeues with given name" do
+    test "by default removes with given name" do
       Example.enqueue!(name: @name_to_trigger_success)
       assert @repo.exists?(Job)
-      Example.dequeue(@name_to_trigger_success)
+      Example.remove(@name_to_trigger_success)
       refute @repo.exists?(Job)
     end
   end

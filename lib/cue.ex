@@ -128,8 +128,8 @@ defmodule Cue do
     end
   end
 
-  @spec dequeue(atom(), name()) :: non_neg_integer()
-  def dequeue(repo, job_name) do
+  @spec remove(atom(), name()) :: non_neg_integer()
+  def remove(repo, job_name) do
     require Ecto.Query
 
     # Synchronously remove job from scheduling/processing
@@ -299,8 +299,8 @@ defmodule Cue do
         |> Cue.enqueue()
       end
 
-      def dequeue(name \\ @cue_name) do
-        Cue.dequeue(@repo, name)
+      def remove(name \\ @cue_name) do
+        Cue.remove(@repo, name)
       end
     end
   end
