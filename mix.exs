@@ -4,12 +4,18 @@ defmodule Cue.MixProject do
   def project do
     [
       app: :cue,
-      version: "0.1.0",
+      version: "0.0.1",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      description: "Postgres backed queue and scheduler.",
+      package: [
+        licenses: ["MIT"],
+        links: %{"GitHub" => "https://github.com/hugomorg/cue"}
+      ],
+      source_url: "https://github.com/hugomorg/cue"
     ]
   end
 
