@@ -2,8 +2,46 @@ defmodule Cue do
   @moduledoc """
   Cue helps you "queue" up, schedule and run tasks.
 
-  Please see README.md for more information.
+  Please see README.md for more information including setup, this is just an intro.
+
+  You define a job like so:
+
   ```
+  defmodule YourApp do
+    use Cue, schedule: "* * * * *"
+
+    @impl true
+    def handle_job(name, state) do
+      # Business logic goes here...
+      :ok
+    end
+
+    @impl true
+    def handle_job_error(name, state, error_info) do
+      # Do something with the error
+      :ok
+    end
+  end
+  ```
+
+  You can pass the following options (`schedule` is given as an example, but actually no options are required until you enqueue the job):
+
+  - `schedule`: a string representing a cron specification, or a UTC `DateTime` value.
+    If it is the latter, it means the job will only be processed once, at that given time.
+    If a cron spec, the job will be repeated.
+
+  - `name`: must be a string, and unique across all jobs. Defaults to the module name.
+
+  - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
+    Defaults to `false`.
+
+  - `max_retries`: how many times the job should be retried in the event of a failure.
+    The retry count gets reset after a successful run.
+    Defaults to `nil`, which means the job will keep retrying.
+
+  It is possible to override any/all of these whenever `enqueue/1` or `enqueue!/1` are called.
+
+  `enqueue/1` / `enqueue!/1` actually create the job at the database level. The job will not start running until this happens.
   """
 
   @type name :: String.t()
