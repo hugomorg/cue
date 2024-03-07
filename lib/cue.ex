@@ -24,24 +24,17 @@ defmodule Cue do
   end
   ```
 
-  You can pass the following options (`schedule` is given as an example, but actually no options are required until you enqueue the job):
+  No options are required until you create the job.
 
-  - `schedule`: a string representing a cron specification, or a UTC `DateTime` value.
-    If it is the latter, it means the job will only be processed once, at that given time.
-    If a cron spec, the job will be repeated.
+  It is possible to override any/all of the "module options" whenever `create_job/1` or `create_job!/1` are called.
 
-  - `name`: must be a string, and unique across all jobs. Defaults to the module name.
+  There are two main types of functions which are defined on the module, to handle creating and removing jobs.
 
-  - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
-    Defaults to `false`.
+  `YourApp.create_job/1` / `YourApp.create_job!/1` actually create the job at the database level. The job will not start running until this happens.
 
-  - `max_retries`: how many times the job should be retried in the event of a failure.
-    The retry count gets reset after a successful run.
-    Defaults to `nil`, which means the job will keep retrying.
+  To remove a job, just call `YourApp.remove_job()` which defaults to the module name but if passed a name removes the corresponding job.
 
-  It is possible to override any/all of these whenever `enqueue/1` or `enqueue!/1` are called.
-
-  `enqueue/1` / `enqueue!/1` actually create the job at the database level. The job will not start running until this happens.
+  If you need further customisation, you can call `Cue.create_job/1` / `Cue.create_job!/1` / `Cue.remove_job/2`.
   """
 
   @type name :: String.t()
@@ -58,7 +51,7 @@ defmodule Cue do
   @optional_callbacks [init: 1]
 
   @type run_at :: DateTime.t()
-  @type enqueue_return :: %{name: name, run_at: run_at}
+  @type create_job_return :: %{name: name, run_at: run_at}
 
   @opts [
     :handler,
@@ -72,8 +65,30 @@ defmodule Cue do
 
   alias Cue.Job
 
-  @spec enqueue!(keyword()) :: enqueue_return
-  def enqueue!(opts) do
+  @doc """
+  Inserts a job into the database.
+
+  Options:
+
+  - `schedule`: a string representing a cron specification, or a UTC `DateTime` value.
+  If it is the latter, it means the job will only be processed once, at that given time.
+  If a cron spec, the job will be repeated.
+
+  - `name`: must be a string, and unique across all jobs. Defaults to the module name.
+
+  - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
+  Defaults to `false`.
+
+  - `max_retries`: how many times the job should be retried in the event of a failure.
+  The retry count gets reset after a successful run.
+  Defaults to `nil`, which means the job will keep retrying.
+
+  - `handler`: a loaded module which defines `handle_job/2` and `handle_job_error/3` callbacks
+
+  Returns the name of the job and the time the job will run next.
+  """
+  @spec create_job!(keyword()) :: create_job_return
+  def create_job!(opts) do
     opts = Keyword.validate!(opts, @opts)
 
     handler = validate_job_handler!(opts[:handler])
@@ -99,8 +114,11 @@ defmodule Cue do
     %{name: job.name, run_at: job.run_at}
   end
 
-  @spec enqueue(keyword()) :: {:error, {atom(), String.t()}} | {:ok, enqueue_return}
-  def enqueue(opts) do
+  @doc """
+  Same as `create_job!/1` but does not raise if there is an error.
+  """
+  @spec create_job(keyword()) :: {:error, {atom(), String.t()}} | {:ok, create_job_return}
+  def create_job(opts) do
     with {:ok, opts} <- Keyword.validate(opts, @opts),
          {:ok, {schedule, run_at}} <- validate_schedule(opts[:schedule]),
          {:ok, handler} <- validate_job_handler(opts[:handler]) do
@@ -128,8 +146,13 @@ defmodule Cue do
     end
   end
 
-  @spec remove(atom(), name()) :: non_neg_integer()
-  def remove(repo, job_name) do
+  @doc """
+  Deletes the job from the database.
+
+  Accepts the repo and job name as arguments.
+  """
+  @spec remove_job(atom(), name()) :: non_neg_integer()
+  def remove_job(repo, job_name) do
     require Ecto.Query
 
     # Synchronously remove job from scheduling/processing
@@ -273,7 +296,40 @@ defmodule Cue do
       @repo Application.compile_env!(:cue, :repo)
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
-      def enqueue!(opts \\ []) do
+      @doc """
+      Inserts a job in the database.
+
+      The options passed are merged into the module options.
+
+      For example if you had defined:
+
+      ```
+      defmodule YourApp do
+        use Cue, schedule: "* * * * *"
+        ...
+      end
+      ```
+
+      Then you could override the schedule on a per-job basis with `YourApp.create_job!(name: "some name", schedule: DateTime.utc_now())`.
+
+      Options:
+
+      - `schedule`: a string representing a cron specification, or a UTC `DateTime` value.
+      If it is the latter, it means the job will only be processed once, at that given time.
+      If a cron spec, the job will be repeated.
+
+      - `name`: must be a string, and unique across all jobs. Defaults to the module name.
+
+      - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
+      Defaults to `false`.
+
+      - `max_retries`: how many times the job should be retried in the event of a failure.
+      The retry count gets reset after a successful run.
+      Defaults to `nil`, which means the job will keep retrying.
+
+      The repo used is the one defined in the config.
+      """
+      def create_job!(opts \\ []) do
         [
           handler: __MODULE__,
           name: @cue_name,
@@ -283,10 +339,13 @@ defmodule Cue do
           max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
-        |> Cue.enqueue!()
+        |> Cue.create_job!()
       end
 
-      def enqueue(opts \\ []) do
+      @doc """
+      Same as `create_job!/1`, but does not raise, returning `{:error, reason}` if there is a problem.
+      """
+      def create_job(opts \\ []) do
         [
           handler: __MODULE__,
           name: @cue_name,
@@ -296,11 +355,18 @@ defmodule Cue do
           max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
-        |> Cue.enqueue()
+        |> Cue.create_job()
       end
 
-      def remove(name \\ @cue_name) do
-        Cue.remove(@repo, name)
+      @doc """
+      Deletes the job from the database.
+
+      Assumes name is the module name, unless a name is provided.
+
+      Uses the repo defined in config.
+      """
+      def remove_job(name \\ @cue_name) do
+        Cue.remove_job(@repo, name)
       end
     end
   end

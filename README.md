@@ -61,7 +61,7 @@ defmodule YourApp do
 end
 ```
 
-Just one final step: when your app is running, call `YourApp.enqueue!()`.
+Just one final step: when your app is running, call `YourApp.create_job!()`.
 
 This creates the job, and everything else will be taken care of!
 
@@ -69,9 +69,11 @@ This creates the job, and everything else will be taken care of!
 
 Let's look at a slightly more complex example. You want to fetch the weather across different continents (let's say London and New York), so there are different APIs. However, you still want to group them under one module.
 
-No problem: just call `YourApp.enqueue!(name: city)` where `city` is the unique name you choose for the job. Then you can just pattern match.
+No problem: just call `YourApp.create_job!(name: city)` where `city` is the unique name you choose for the job. Then you can just pattern match.
 
 If you don't specify a name, the module is used as the default name.
+
+If you want to remove a job, it's: `YourApp.remove_job(name)`. If `name` isn't passed, the module is again used as the default.
 
 ```elixir
 defmodule YourApp do
@@ -104,9 +106,9 @@ end
 
 Ok, so now we know how to schedule jobs. But what about one-off jobs? If the weather is really bad, maybe you want to send an email. But you don't want this to repeat - just ensure it is handled properly within a certain time-frame.
 
-Simply pass a UTC `DateTime` as the `schedule` in `enqueue!/1`/`enqueue/1`. If you want the job to run immediately you can do something like `enqueue!(schedule: DateTime.utc_now())` (don't worry if it is slightly in the past, it will still run immediately).
+Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1`/`create_job/1`. If you want the job to run immediately you can do something like `create_job!(schedule: DateTime.utc_now())` (don't worry if it is slightly in the past, it will still run immediately).
 
-If you want the job to be cleaned up regardless of status, set `autoremove` to `true`, either in `enqueue!/1`/`enqueue/1` or at the module level. This does not apply to scheduled jobs.
+If you want the job to be cleaned up regardless of status, set `autoremove` to `true`, either in `create_job!/1`/`create_job/1` or at the module level. This does not apply to scheduled jobs.
 
 ## Keeping context / state
 
@@ -152,7 +154,7 @@ If there is a crash, it will get caught, and your error handler `handle_job_erro
 
 The 3rd argument of `handle_job_error/3` is a map containing `error` (the error reason), `retry_count` and `max_retries`. By default `max_retries` is `nil`, meaning the job will retry infinitely. By retry, we mean that it will get re-run at the next scheduled time.
 
-You can define `max_retries` at the module level, and also override it in `enqueue!/1`/`enqueue/1`. If the `max_retries` is exceeded then the job is paused.
+You can define `max_retries` at the module level, and also override it in `create_job!/1`/`create_job/1`. If the `max_retries` is exceeded then the job is paused.
 
 If you want to update state after you return an error, you can do so by returning `{:error, error, state}`.
 

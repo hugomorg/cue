@@ -61,9 +61,9 @@ defmodule CueTest do
     end
   end
 
-  describe "enqueue!/1" do
+  describe "create_job!/1" do
     test "successfully inserts job into table - assumed module defaults" do
-      assert %{name: "CueTest.Example", run_at: %DateTime{}} = Example.enqueue!()
+      assert %{name: "CueTest.Example", run_at: %DateTime{}} = Example.create_job!()
       assert job = @repo.one!(Job)
       assert job.name == "CueTest.Example"
       assert job.state == %{id: 0}
@@ -77,7 +77,7 @@ defmodule CueTest do
     end
 
     test "options can be overridden" do
-      assert Example.enqueue!(name: "GBP-EUR", schedule: "*/45 * * * *")
+      assert Example.create_job!(name: "GBP-EUR", schedule: "*/45 * * * *")
       assert job = @repo.one!(Job)
       assert job.name == "GBP-EUR"
       assert job.schedule == "*/45 * * * *"
@@ -86,7 +86,7 @@ defmodule CueTest do
     @tag :slow
     test "successful job is updated properly" do
       now = DateTime.utc_now()
-      Example.enqueue!(name: @name_to_trigger_success)
+      Example.create_job!(name: @name_to_trigger_success)
       :timer.sleep(2000)
       assert job = @repo.one!(Job)
       assert job.state.id > 0
@@ -100,7 +100,7 @@ defmodule CueTest do
     @tag :slow
     test "schedule can be datetime" do
       now = DateTime.utc_now()
-      Example.enqueue!(name: @name_to_trigger_success, schedule: now)
+      Example.create_job!(name: @name_to_trigger_success, schedule: now)
       :timer.sleep(2000)
       assert job = @repo.one!(Job)
       assert job.state.id > 0
@@ -111,7 +111,7 @@ defmodule CueTest do
     @tag :slow
     test "job returning error is updated properly" do
       now = DateTime.utc_now()
-      Example.enqueue!(name: @name_to_trigger_error)
+      Example.create_job!(name: @name_to_trigger_error)
       :timer.sleep(2000)
       assert job = @repo.one!(Job)
       assert DateTime.compare(job.last_failed_at, now) == :gt
@@ -124,7 +124,7 @@ defmodule CueTest do
     @tag :slow
     test "max_retries works" do
       now = DateTime.utc_now()
-      Example.enqueue!(name: @name_to_trigger_error, max_retries: 1)
+      Example.create_job!(name: @name_to_trigger_error, max_retries: 1)
       :timer.sleep(2000)
       assert job = @repo.one!(Job)
       assert DateTime.compare(job.last_failed_at, now) == :gt
@@ -136,7 +136,7 @@ defmodule CueTest do
     @tag :slow
     test "job which crashed is updated properly" do
       now = DateTime.utc_now()
-      Example.enqueue!(name: @name_to_trigger_crash)
+      Example.create_job!(name: @name_to_trigger_crash)
       :timer.sleep(2000)
       assert job = @repo.one!(Job)
       assert DateTime.compare(job.last_failed_at, now) == :gt
@@ -147,34 +147,34 @@ defmodule CueTest do
     end
 
     test "schedule doesn't need to be defined at module" do
-      assert Example2.enqueue!(schedule: DateTime.utc_now())
+      assert Example2.create_job!(schedule: DateTime.utc_now())
     end
 
     test "one-off jobs are not retried" do
-      assert Example2.enqueue!(schedule: DateTime.utc_now(), name: "fail")
+      assert Example2.create_job!(schedule: DateTime.utc_now(), name: "fail")
       @repo.one!(Job)
       :timer.sleep(1000)
       assert @repo.one!(Job).retry_count == 0
     end
 
     test "one-off jobs are removed after running if autoremove is true" do
-      assert Example2.enqueue!(schedule: DateTime.utc_now(), autoremove: true)
+      assert Example2.create_job!(schedule: DateTime.utc_now(), autoremove: true)
       @repo.one!(Job)
       :timer.sleep(1000)
       refute @repo.exists?(Job)
     end
 
     test "scheduled jobs are not removed even if autoremove is true" do
-      assert Example2.enqueue!(schedule: "* * * * * *", autoremove: true)
+      assert Example2.create_job!(schedule: "* * * * * *", autoremove: true)
       @repo.one!(Job)
       :timer.sleep(1000)
       assert @repo.exists?(Job)
     end
   end
 
-  describe "enqueue/1" do
+  describe "create_job/1" do
     test "successfully inserts job into table - assumed module defaults" do
-      assert {:ok, %{name: "CueTest.Example", run_at: %DateTime{}}} = Example.enqueue()
+      assert {:ok, %{name: "CueTest.Example", run_at: %DateTime{}}} = Example.create_job()
       assert job = @repo.one!(Job)
       assert job.name == "CueTest.Example"
       assert job.state == %{id: 0}
@@ -188,35 +188,35 @@ defmodule CueTest do
     end
 
     test "returns error if job exists" do
-      Example.enqueue()
-      assert Example.enqueue() == {:error, {:job_exists, "CueTest.Example"}}
+      Example.create_job()
+      assert Example.create_job() == {:error, {:job_exists, "CueTest.Example"}}
     end
 
     test "returns error if cron invalid" do
-      assert {:error, {:invalid_schedule, _msg}} = Example.enqueue(schedule: "* * *")
+      assert {:error, {:invalid_schedule, _msg}} = Example.create_job(schedule: "* * *")
     end
 
     test "returns error if schedule invalid" do
-      assert {:error, {:invalid_schedule, _msg}} = Example.enqueue(schedule: 2)
+      assert {:error, {:invalid_schedule, _msg}} = Example.create_job(schedule: 2)
     end
 
     test "returns error if handler invalid" do
-      assert {:error, {:invalid_handler, _msg}} = Example.enqueue(handler: :yo)
+      assert {:error, {:invalid_handler, _msg}} = Example.create_job(handler: :yo)
     end
   end
 
-  describe "remove/2" do
+  describe "remove_job/2" do
     test "by default removes assumed job" do
-      Example.enqueue!()
+      Example.create_job!()
       assert @repo.exists?(Job)
-      Example.remove()
+      Example.remove_job()
       refute @repo.exists?(Job)
     end
 
     test "by default removes with given name" do
-      Example.enqueue!(name: @name_to_trigger_success)
+      Example.create_job!(name: @name_to_trigger_success)
       assert @repo.exists?(Job)
-      Example.remove(@name_to_trigger_success)
+      Example.remove_job(@name_to_trigger_success)
       refute @repo.exists?(Job)
     end
   end

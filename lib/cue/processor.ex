@@ -33,8 +33,8 @@ defmodule Cue.Processor do
              |> lock("FOR UPDATE SKIP LOCKED")
            )
            |> Ecto.Multi.run(:job, fn _repo, changes -> maybe_handle_job(changes) end)
-           |> Ecto.Multi.run(:maybe_delete_job, fn _repo, changes ->
-             maybe_delete_job(changes.job)
+           |> Ecto.Multi.run(:maybe_remove_job, fn _repo, changes ->
+             maybe_remove_job(changes.job)
            end)
            |> @repo.transaction() do
       {:ok, job}
@@ -66,11 +66,11 @@ defmodule Cue.Processor do
     {:ok, job}
   end
 
-  defp maybe_delete_job(job = %Job{}) do
+  defp maybe_remove_job(job = %Job{}) do
     {:ok, Job.remove?(job) and !!@repo.delete!(job)}
   end
 
-  defp maybe_delete_job(:locked) do
+  defp maybe_remove_job(:locked) do
     {:ok, :locked}
   end
 

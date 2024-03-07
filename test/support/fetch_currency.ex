@@ -16,7 +16,7 @@ defmodule Cue.FetchCurrency do
       |> Enum.take(100)
 
     for job <- special_pairs ++ combos do
-      enqueue!(job)
+      create_job!(job)
     end
   end
 
