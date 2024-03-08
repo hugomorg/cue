@@ -18,7 +18,7 @@ defmodule Cue.Application do
     |> Supervisor.start_link(opts)
   end
 
-  defp maybe_start_test_repo(children, env) when env in [:dev, :test] do
+  defp maybe_start_test_repo(children, env) when env in [:test] do
     [Cue.TestRepo] ++ children
   end
 
