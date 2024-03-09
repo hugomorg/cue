@@ -18,6 +18,14 @@ defmodule Cue.Application do
     |> Supervisor.start_link(opts)
   end
 
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :supervisor
+    }
+  end
+
   defp maybe_start_test_repo(children, env) when env in [:test] do
     [Cue.TestRepo] ++ children
   end
