@@ -65,6 +65,29 @@ defmodule Cue do
 
   alias Cue.Job
 
+  use Supervisor
+
+  def start_link(init_arg) do
+    Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
+  end
+
+  @impl true
+  def init(_init_arg) do
+    children = [{Task.Supervisor, name: Cue.TaskProcessor}, Cue.Scheduler]
+
+    children
+    |> maybe_start_test_repo(Mix.env())
+    |> Supervisor.init(strategy: :one_for_one)
+  end
+
+  defp maybe_start_test_repo(children, env) when env in [:test] do
+    [Cue.TestRepo] ++ children
+  end
+
+  defp maybe_start_test_repo(children, _env) do
+    children
+  end
+
   @doc """
   Inserts a job into the database.
 
