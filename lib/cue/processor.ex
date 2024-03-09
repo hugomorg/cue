@@ -4,7 +4,7 @@ defmodule Cue.Processor do
   require Logger
   import Ecto.Query
   alias Cue.Job
-  @repo Application.compile_env!(:cue, :repo)
+  @repo Application.compile_env(:cue, :repo)
   @max_concurrency Application.compile_env(:cue, :max_concurrency, 5)
   @timeout Application.compile_env(:cue, :timeout, 5000)
 

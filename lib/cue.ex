@@ -76,16 +76,16 @@ defmodule Cue do
     children = [{Task.Supervisor, name: Cue.TaskProcessor}, Cue.Scheduler]
 
     children
-    |> maybe_start_test_repo(Mix.env())
+    |> maybe_start_test_repo()
     |> Supervisor.init(strategy: :one_for_one)
   end
 
-  defp maybe_start_test_repo(children, env) when env in [:test] do
-    [Cue.TestRepo] ++ children
-  end
-
-  defp maybe_start_test_repo(children, _env) do
-    children
+  defp maybe_start_test_repo(children) do
+    if Application.get_env(:cue, :start_test_repo?, false) do
+      [Cue.TestRepo] ++ children
+    else
+      children
+    end
   end
 
   @doc """
@@ -316,7 +316,7 @@ defmodule Cue do
 
     quote do
       @behaviour Cue
-      @repo Application.compile_env!(:cue, :repo)
+      @repo Application.compile_env(:cue, :repo)
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       @doc """

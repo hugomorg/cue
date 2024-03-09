@@ -5,7 +5,7 @@ defmodule Cue.Scheduler do
   require Logger
   import Ecto.Query
   alias Cue.Job
-  @repo Cue.TestRepo
+  @repo Application.compile_env(:cue, :repo)
 
   @check_every_seconds 1
 
@@ -23,11 +23,20 @@ defmodule Cue.Scheduler do
     GenServer.call(__MODULE__, {:remove_job_from_ignored, job_name})
   end
 
-  ## GenServer callbacks
-  @impl true
-  def init(_args) do
-    loop(:check, @check_every_seconds)
-    {:ok, %{ignore_jobs: []}}
+  if @repo do
+    ## GenServer callbacks
+    @impl true
+    def init(_args) do
+      loop(:check, @check_every_seconds)
+
+      {:ok, %{ignore_jobs: []}}
+    end
+  else
+    @impl true
+    def init(_args) do
+      Logger.warn("No repo, scheduler will not loop")
+      {:ok, %{ignore_jobs: []}}
+    end
   end
 
   @impl true

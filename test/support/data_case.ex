@@ -15,6 +15,7 @@ defmodule Cue.DataCase do
   end
 
   setup tags do
+    Cue.TestRepo.start_link()
     :ok = Sandbox.checkout(Cue.TestRepo)
 
     unless tags[:async] do
