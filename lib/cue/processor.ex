@@ -44,17 +44,20 @@ defmodule Cue.Processor do
   defp maybe_handle_job(%{free_job: nil}), do: {:ok, :locked}
 
   defp maybe_handle_job(changes) do
+    previous_status = changes.free_job.status
     job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
 
     job =
       case apply(job.handler, :handle_job, [job.name, job.state]) do
         {:error, error} ->
-          maybe_apply_error_handler(job)
-          update_job_as_failed!(job, job.state, error)
+          failed_job = update_job_as_failed!(job, job.state, error, previous_status)
+          maybe_apply_error_handler(failed_job)
+          failed_job
 
         {:error, error, state} ->
-          maybe_apply_error_handler(job)
-          update_job_as_failed!(job, state, error)
+          failed_job = update_job_as_failed!(job, state, error, previous_status)
+          maybe_apply_error_handler(failed_job)
+          failed_job
 
         {:ok, state} ->
           update_job_as_success!(job, state)
@@ -74,12 +77,13 @@ defmodule Cue.Processor do
     {:ok, :locked}
   end
 
-  defp update_job_as_failed!(job, state, error) do
+  defp update_job_as_failed!(job, state, error, previous_status) do
     now = DateTime.utc_now()
 
     {status, retry_count} =
       cond do
-        Job.one_off?(job) -> {:failed, job.retry_count}
+        previous_status not in [:paused, :failed] -> {:failed, 0}
+        Job.one_off?(job) -> {:failed, 0}
         Job.retries_exceeded?(job) -> {:paused, job.retry_count}
         :else -> {:failed, job.retry_count + 1}
       end
@@ -117,6 +121,8 @@ defmodule Cue.Processor do
     |> @repo.update!
   end
 
+  defp maybe_apply_error_handler(%Job{status: :paused}), do: :skip
+
   defp maybe_apply_error_handler(job) do
     apply(job.handler, :handle_job_error, [
       job.name,
@@ -126,10 +132,12 @@ defmodule Cue.Processor do
   end
 
   defp handle_crashed_jobs(failed_jobs) do
+    # `job` in error callback will be job passed into stream function
+    # that is, the job whose status has not been marked as `processing`
     Enum.each(failed_jobs, fn {:exit, {job, error}} ->
       Logger.warning("job=#{job.id} crashed, error=#{inspect(error)}")
-      maybe_apply_error_handler(job)
-      update_job_as_failed!(job, job.state, error)
+      failed_job = update_job_as_failed!(job, job.state, error, job.status)
+      maybe_apply_error_handler(failed_job)
     end)
   end
 end
