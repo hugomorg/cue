@@ -43,6 +43,14 @@ defmodule Cue.Processor do
 
   defp maybe_handle_job(%{free_job: nil}), do: {:ok, :locked}
 
+  defp maybe_handle_job(%{free_job: %Job{status: :paused}}) do
+    {:ok, :skipped}
+  end
+
+  defp maybe_handle_job(%{free_job: job = %Job{retry_count: r, max_retries: m}}) when r >= m do
+    {:ok, {:skipped, job}}
+  end
+
   defp maybe_handle_job(changes) do
     previous_status = changes.free_job.status
     job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
@@ -77,15 +85,20 @@ defmodule Cue.Processor do
     {:ok, :locked}
   end
 
+  defp maybe_remove_job({:skipped, job}) do
+    maybe_remove_job(job)
+  end
+
   defp update_job_as_failed!(job, state, error, previous_status) do
     now = DateTime.utc_now()
 
+    previous_job_failed? = previous_status == :failed
+
     {status, retry_count} =
-      cond do
-        previous_status not in [:paused, :failed] -> {:failed, 0}
-        Job.one_off?(job) -> {:failed, 0}
-        Job.retries_exceeded?(job) -> {:paused, job.retry_count}
-        :else -> {:failed, job.retry_count + 1}
+      if not previous_job_failed? or Job.one_off?(job) do
+        {:failed, 0}
+      else
+        {:failed, job.retry_count + 1}
       end
 
     last_error =

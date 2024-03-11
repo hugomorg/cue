@@ -57,7 +57,11 @@ defmodule Cue.Scheduler do
     Job
     |> where([j], ^DateTime.utc_now() >= j.run_at)
     # for one-off jobs
-    |> where([j], (not is_nil(j.schedule) and j.status != :paused) or j.status == :not_started)
+    |> where(
+      [j],
+      (not is_nil(j.schedule) and (is_nil(j.max_retries) or j.retry_count < j.max_retries)) or
+        j.status == :not_started
+    )
     |> order_by(:run_at)
     |> @repo.all()
     |> Enum.filter(&(&1.name not in state.ignore_jobs))
