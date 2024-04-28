@@ -99,6 +99,8 @@ defmodule Cue do
 
   - `name`: must be a string, and unique across all jobs. Defaults to the module name.
 
+  - `state`: any Elixir term passed to the handler
+
   - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
   Defaults to `false`.
 
@@ -112,27 +114,27 @@ defmodule Cue do
   """
   @spec create_job!(keyword()) :: create_job_return
   def create_job!(opts) do
-    opts = Keyword.validate!(opts, @opts)
+    validated_opts = Keyword.validate!(opts, @opts)
 
-    handler = validate_job_handler!(opts[:handler])
+    handler = validate_job_handler!(validated_opts[:handler])
 
-    state = init_job(opts[:name], handler)
+    state = Keyword.get_lazy(opts, :state, fn -> init_job(opts[:name], handler) end)
 
-    {schedule, run_at} = validate_schedule!(opts[:schedule])
+    {schedule, run_at} = validate_schedule!(validated_opts[:schedule])
 
     job =
       %Job{}
       |> Job.changeset(%{
-        name: opts[:name],
+        name: validated_opts[:name],
         handler: handler,
         run_at: run_at,
         schedule: schedule,
         status: :not_started,
-        max_retries: opts[:max_retries],
+        max_retries: validated_opts[:max_retries],
         state: state,
-        autoremove: opts[:autoremove]
+        autoremove: validated_opts[:autoremove]
       })
-      |> opts[:repo].insert!()
+      |> validated_opts[:repo].insert!()
 
     %{name: job.name, run_at: job.run_at}
   end
@@ -142,29 +144,29 @@ defmodule Cue do
   """
   @spec create_job(keyword()) :: {:error, {atom(), String.t()}} | {:ok, create_job_return}
   def create_job(opts) do
-    with {:ok, opts} <- Keyword.validate(opts, @opts),
-         {:ok, {schedule, run_at}} <- validate_schedule(opts[:schedule]),
-         {:ok, handler} <- validate_job_handler(opts[:handler]) do
-      state = init_job(opts[:name], handler)
+    with {:ok, validated_opts} <- Keyword.validate(opts, @opts),
+         {:ok, {schedule, run_at}} <- validate_schedule(validated_opts[:schedule]),
+         {:ok, handler} <- validate_job_handler(validated_opts[:handler]) do
+      state = Keyword.get_lazy(opts, :state, fn -> init_job(validated_opts[:name], handler) end)
 
       case %Job{}
            |> Job.changeset(%{
-             name: opts[:name],
+             name: validated_opts[:name],
              handler: handler,
              run_at: run_at,
              schedule: schedule,
              status: :not_started,
-             max_retries: opts[:max_retries],
-             autoremove: opts[:autoremove],
+             max_retries: validated_opts[:max_retries],
+             autoremove: validated_opts[:autoremove],
              state: state
            })
-           |> opts[:repo].insert() do
+           |> validated_opts[:repo].insert() do
         {:ok, job} ->
           {:ok, %{name: job.name, run_at: job.run_at}}
 
         {:error,
          %{errors: [name: {_msg, [constraint: :unique, constraint_name: "cue_jobs_name_index"]}]}} ->
-          {:error, {:job_exists, opts[:name]}}
+          {:error, {:job_exists, validated_opts[:name]}}
       end
     end
   end
