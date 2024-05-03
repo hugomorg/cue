@@ -36,7 +36,7 @@ defmodule Cue.Processor do
            |> Ecto.Multi.run(:maybe_remove_job, fn _repo, changes ->
              maybe_remove_job(changes.job)
            end)
-           |> @repo.transaction() do
+           |> @repo.transaction(timeout: @timeout) do
       {:ok, job}
     end
   end
