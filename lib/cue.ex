@@ -145,36 +145,35 @@ defmodule Cue do
     %{name: job.name, run_at: job.run_at}
   end
 
+  @no_conflict_opts [conflict_target: :name, on_conflict: :nothing]
+
   @doc """
   Same as `create_job!/1` but does not raise if there is an error.
   """
   @spec create_job(keyword()) :: {:error, {atom(), String.t()}} | {:ok, create_job_return}
   def create_job(opts) do
-    with {:ok, validated_opts} <- Keyword.validate(opts, @opts),
-         {:ok, {schedule, run_at}} <- validate_schedule(validated_opts[:schedule]),
-         {:ok, handler} <- validate_job_handler(validated_opts[:handler]),
-         :ok <- validate_repo(validated_opts[:repo]),
-         :ok <- validate_name(validated_opts[:name]) do
-      state = Keyword.get_lazy(opts, :state, fn -> init_job(validated_opts[:name], handler) end)
-
-      case %Job{}
-           |> Job.changeset(%{
-             name: validated_opts[:name],
-             handler: handler,
-             run_at: run_at,
-             schedule: schedule,
-             status: :not_started,
-             max_retries: validated_opts[:max_retries],
-             autoremove: validated_opts[:autoremove] || false,
-             state: state
-           })
-           |> validated_opts[:repo].insert() do
+    with {:ok, changeset = %Ecto.Changeset{}, validated_opts} <- prepare_job(opts) do
+      case validated_opts[:repo].insert(changeset) do
         {:ok, job} ->
           {:ok, %{name: job.name, run_at: job.run_at}}
 
         {:error,
          %{errors: [name: {_msg, [constraint: :unique, constraint_name: "cue_jobs_name_index"]}]}} ->
           {:error, {:job_exists, validated_opts[:name]}}
+      end
+    end
+  end
+
+  @spec create_job_unless_exists(keyword()) ::
+          {:error, {atom(), String.t()}} | {:ok, create_job_return}
+  def create_job_unless_exists(opts) do
+    with {:ok, changeset = %Ecto.Changeset{}, validated_opts} <- prepare_job(opts) do
+      case validated_opts[:repo].insert(changeset, @no_conflict_opts) do
+        {:ok, job} ->
+          {:ok, %{name: job.name, run_at: job.run_at}}
+
+        {:error, error} ->
+          {:error, error}
       end
     end
   end
@@ -228,6 +227,29 @@ defmodule Cue do
       :ok
     else
       {:error, :no_repo}
+    end
+  end
+
+  defp prepare_job(opts) do
+    with {:ok, validated_opts} <- Keyword.validate(opts, @opts),
+         {:ok, {schedule, run_at}} <- validate_schedule(validated_opts[:schedule]),
+         {:ok, handler} <- validate_job_handler(validated_opts[:handler]),
+         :ok <- validate_repo(validated_opts[:repo]),
+         :ok <- validate_name(validated_opts[:name]) do
+      state = Keyword.get_lazy(opts, :state, fn -> init_job(validated_opts[:name], handler) end)
+
+      {:ok,
+       %Job{}
+       |> Job.changeset(%{
+         name: validated_opts[:name],
+         handler: handler,
+         run_at: run_at,
+         schedule: schedule,
+         status: :not_started,
+         max_retries: validated_opts[:max_retries],
+         autoremove: validated_opts[:autoremove] || false,
+         state: state
+       }), validated_opts}
     end
   end
 
