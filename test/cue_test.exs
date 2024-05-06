@@ -60,6 +60,52 @@ defmodule CueTest do
       assert job.name == "job"
       assert job.run_at == DateTime.truncate(now, :second)
     end
+
+    test "passes on necessary options and sets defaults" do
+      assert {:ok, job} =
+               Cue.create_job(
+                 schedule: DateTime.utc_now(),
+                 handler: Example,
+                 repo: @repo,
+                 name: "job"
+               )
+
+      inserted_job = @repo.one!(Cue.Job)
+
+      assert inserted_job.handler == Example
+      assert inserted_job.name == job.name
+      assert inserted_job.retry_count == 0
+      assert inserted_job.run_at == job.run_at
+      assert inserted_job.status == :not_started
+
+      refute inserted_job.autoremove
+      refute inserted_job.last_error
+      refute inserted_job.last_failed_at
+      refute inserted_job.last_succeeded_at
+      refute inserted_job.max_retries
+      refute inserted_job.schedule
+      refute inserted_job.state
+    end
+
+    test "other settings can be overridden" do
+      assert {:ok, job} =
+               Cue.create_job(
+                 schedule: "*/1 * * * *",
+                 handler: Example,
+                 repo: @repo,
+                 name: "job",
+                 max_retries: 5,
+                 autoremove: true,
+                 state: %{key: :value}
+               )
+
+      inserted_job = @repo.one!(Cue.Job)
+
+      assert inserted_job.autoremove
+      assert inserted_job.max_retries == 5
+      assert inserted_job.schedule == "*/1 * * * *"
+      assert inserted_job.state == %{key: :value}
+    end
   end
 
   describe "create_job!/1" do
@@ -108,6 +154,52 @@ defmodule CueTest do
 
       assert job.name == "job"
       assert job.run_at == DateTime.truncate(now, :second)
+    end
+
+    test "passes on necessary options and sets defaults" do
+      assert job =
+               Cue.create_job!(
+                 schedule: DateTime.utc_now(),
+                 handler: Example,
+                 repo: @repo,
+                 name: "job"
+               )
+
+      inserted_job = @repo.one!(Cue.Job)
+
+      assert inserted_job.handler == Example
+      assert inserted_job.name == job.name
+      assert inserted_job.retry_count == 0
+      assert inserted_job.run_at == job.run_at
+      assert inserted_job.status == :not_started
+
+      refute inserted_job.autoremove
+      refute inserted_job.last_error
+      refute inserted_job.last_failed_at
+      refute inserted_job.last_succeeded_at
+      refute inserted_job.max_retries
+      refute inserted_job.schedule
+      refute inserted_job.state
+    end
+
+    test "other settings can be overridden" do
+      assert job =
+               Cue.create_job!(
+                 schedule: "*/1 * * * *",
+                 handler: Example,
+                 repo: @repo,
+                 name: "job",
+                 max_retries: 5,
+                 autoremove: true,
+                 state: %{key: :value}
+               )
+
+      inserted_job = @repo.one!(Cue.Job)
+
+      assert inserted_job.autoremove
+      assert inserted_job.max_retries == 5
+      assert inserted_job.schedule == "*/1 * * * *"
+      assert inserted_job.state == %{key: :value}
     end
   end
 end
