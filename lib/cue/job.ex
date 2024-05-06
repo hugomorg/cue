@@ -6,18 +6,18 @@ defmodule Cue.Job do
   @status_values [not_started: 0, processing: 1, failed: 2, succeeded: 3, paused: 4]
 
   schema "cue_jobs" do
-    field(:name, :string)
+    field(:autoremove, :boolean, default: false)
     field(:handler, Cue.ElixirTerm)
     field(:last_error, :string)
-    field(:schedule, :string)
-    field(:retry_count, :integer)
-    field(:max_retries, :integer)
-    field(:state, Cue.ElixirTerm)
-    field(:last_succeeded_at, :utc_datetime_usec)
     field(:last_failed_at, :utc_datetime_usec)
+    field(:last_succeeded_at, :utc_datetime_usec)
+    field(:max_retries, :integer)
+    field(:name, :string)
+    field(:retry_count, :integer)
     field(:run_at, :utc_datetime)
+    field(:schedule, :string)
+    field(:state, Cue.ElixirTerm)
     field(:status, Ecto.Enum, values: @status_values)
-    field(:autoremove, :boolean, default: false)
 
     timestamps(updated_at: false)
   end
@@ -25,18 +25,18 @@ defmodule Cue.Job do
   def changeset(job, params) do
     job
     |> cast(params, [
-      :name,
-      :schedule,
+      :autoremove,
       :handler,
-      :status,
-      :last_succeeded_at,
-      :last_failed_at,
       :last_error,
-      :run_at,
-      :retry_count,
-      :state,
+      :last_failed_at,
+      :last_succeeded_at,
       :max_retries,
-      :autoremove
+      :name,
+      :retry_count,
+      :run_at,
+      :schedule,
+      :state,
+      :status
     ])
     |> validate_required([:status, :run_at, :name, :handler, :autoremove])
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
