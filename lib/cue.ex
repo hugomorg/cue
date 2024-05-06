@@ -118,6 +118,12 @@ defmodule Cue do
 
     handler = validate_job_handler!(validated_opts[:handler])
 
+    unless Code.ensure_loaded?(validated_opts[:repo]),
+      do: raise(__MODULE__.Error, message: "No repo")
+
+    unless validated_opts[:name], do: raise(__MODULE__.Error, message: "No name")
+    unless is_binary(validated_opts[:name]), do: raise(__MODULE__.Error, message: "Invalid name")
+
     state = Keyword.get_lazy(opts, :state, fn -> init_job(opts[:name], handler) end)
 
     {schedule, run_at} = validate_schedule!(validated_opts[:schedule])
@@ -132,7 +138,7 @@ defmodule Cue do
         status: :not_started,
         max_retries: validated_opts[:max_retries],
         state: state,
-        autoremove: validated_opts[:autoremove]
+        autoremove: validated_opts[:autoremove] || false
       })
       |> validated_opts[:repo].insert!()
 
@@ -146,7 +152,9 @@ defmodule Cue do
   def create_job(opts) do
     with {:ok, validated_opts} <- Keyword.validate(opts, @opts),
          {:ok, {schedule, run_at}} <- validate_schedule(validated_opts[:schedule]),
-         {:ok, handler} <- validate_job_handler(validated_opts[:handler]) do
+         {:ok, handler} <- validate_job_handler(validated_opts[:handler]),
+         :ok <- validate_repo(validated_opts[:repo]),
+         :ok <- validate_name(validated_opts[:name]) do
       state = Keyword.get_lazy(opts, :state, fn -> init_job(validated_opts[:name], handler) end)
 
       case %Job{}
@@ -157,7 +165,7 @@ defmodule Cue do
              schedule: schedule,
              status: :not_started,
              max_retries: validated_opts[:max_retries],
-             autoremove: validated_opts[:autoremove],
+             autoremove: validated_opts[:autoremove] || false,
              state: state
            })
            |> validated_opts[:repo].insert() do
@@ -215,22 +223,32 @@ defmodule Cue do
     |> repo.all()
   end
 
-  defp validate_job_handler!(handler) when is_atom(handler) do
-    module_exists? = Code.ensure_loaded?(handler)
-    job_handler_defined? = function_exported?(handler, :handle_job, 2)
-    error_handler_defined? = function_exported?(handler, :handle_job_error, 3)
-
-    cond do
-      module_exists? and job_handler_defined? and error_handler_defined? ->
-        handler
-
-      module_exists? and job_handler_defined? ->
-        raise handle_job_error_error_message(handler)
-
-      :else ->
-        raise handle_job_error_message(handler)
+  defp validate_repo(repo) do
+    if Code.ensure_loaded?(repo) do
+      :ok
+    else
+      {:error, :no_repo}
     end
   end
+
+  defp validate_name(nil), do: {:error, :no_name}
+
+  defp validate_name(name) do
+    if is_binary(name) do
+      :ok
+    else
+      {:error, {:invalid_name, "Must be string"}}
+    end
+  end
+
+  defp validate_job_handler!(handler) when is_atom(handler) do
+    case validate_job_handler(handler) do
+      {:ok, handler} -> handler
+      {:error, {:invalid_handler, msg}} -> raise __MODULE__.Error, message: msg
+    end
+  end
+
+  defp validate_job_handler(nil), do: {:error, {:invalid_handler, "Please define a handler"}}
 
   defp validate_job_handler(handler) when is_atom(handler) do
     module_exists? = Code.ensure_loaded?(handler)
@@ -394,5 +412,9 @@ defmodule Cue do
         Cue.remove_job(@repo, name)
       end
     end
+  end
+
+  defmodule Error do
+    defexception [:message]
   end
 end
