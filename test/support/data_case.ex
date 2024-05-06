@@ -1,8 +1,6 @@
 defmodule Cue.DataCase do
   use ExUnit.CaseTemplate
 
-  alias Ecto.Adapters.SQL.Sandbox
-
   using do
     quote do
       import Ecto
@@ -15,13 +13,19 @@ defmodule Cue.DataCase do
   end
 
   setup tags do
-    Cue.TestRepo.start_link()
-    :ok = Sandbox.checkout(Cue.TestRepo)
-
-    unless tags[:async] do
-      Sandbox.mode(Cue.TestRepo, {:shared, self()})
-    end
-
+    start_supervised(Cue.TestRepo)
+    Cue.DataCase.setup_sandbox(tags)
     :ok
+  end
+
+  @doc """
+  Sets up the sandbox based on the test tags.
+  """
+  def setup_sandbox(tags) do
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Cue.TestRepo, shared: not tags[:async])
+
+    on_exit(fn ->
+      Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
+    end)
   end
 end
