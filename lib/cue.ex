@@ -313,7 +313,8 @@ defmodule Cue do
           state
 
         unexpected_return ->
-          raise "You must return `{:ok, state}` from your `init/1` function, received #{inspect(unexpected_return)}"
+          raise Cue.Error,
+                "You must return `{:ok, state}` from your `init/1` function, received #{inspect(unexpected_return)}"
       end
     end
   end
@@ -327,7 +328,7 @@ defmodule Cue do
   end
 
   defp validate_schedule!(schedule) do
-    raise schedule_error_message(schedule)
+    raise Cue.Error, schedule_error_message(schedule)
   end
 
   defp validate_schedule(schedule) when is_binary(schedule) do
@@ -434,6 +435,32 @@ defmodule Cue do
         ]
         |> Keyword.merge(opts)
         |> Cue.create_job()
+      end
+
+      def create_job_unless_exists!(opts \\ []) do
+        [
+          handler: __MODULE__,
+          name: @cue_name,
+          schedule: unquote(schedule),
+          repo: @repo,
+          autoremove: unquote(autoremove),
+          max_retries: unquote(max_retries)
+        ]
+        |> Keyword.merge(opts)
+        |> Cue.create_job_unless_exists!()
+      end
+
+      def create_job_unless_exists(opts \\ []) do
+        [
+          handler: __MODULE__,
+          name: @cue_name,
+          schedule: unquote(schedule),
+          repo: @repo,
+          autoremove: unquote(autoremove),
+          max_retries: unquote(max_retries)
+        ]
+        |> Keyword.merge(opts)
+        |> Cue.create_job_unless_exists()
       end
 
       @doc """

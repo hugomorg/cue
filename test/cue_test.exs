@@ -22,6 +22,24 @@ defmodule CueTest do
 
   defmodule Example do
     use Cue
+    def handle_job(_, _), do: :ok
+
+    def handle_job_error(_, _, _), do: :ok
+  end
+
+  defmodule ExampleMinimal do
+    use Cue, schedule: "*/2 * * * *"
+    def handle_job(_, _), do: :ok
+
+    def handle_job_error(_, _, _), do: :ok
+  end
+
+  defmodule ExampleWithOpts do
+    use Cue,
+      name: "Hard worker",
+      schedule: "2/* * * * *",
+      autoremove: true,
+      max_retries: 100
 
     def handle_job(_, _), do: :ok
 
@@ -440,6 +458,107 @@ defmodule CueTest do
 
       Cue.create_job_unless_exists!(params)
       Cue.create_job_unless_exists!(params)
+    end
+  end
+
+  describe "__using__/1" do
+    test "validates missing opts" do
+      assert_raise Cue.Error, fn ->
+        Example.create_job!()
+      end
+    end
+
+    test "create_job!/1 is defined on bare minimum example" do
+      job = ExampleMinimal.create_job!()
+
+      inserted_job = @repo.one!(Job)
+
+      assert job.name == "CueTest.ExampleMinimal"
+      assert job.name == inserted_job.name
+      assert inserted_job.retry_count == 0
+      assert inserted_job.run_at == job.run_at
+      assert inserted_job.status == :not_started
+      assert inserted_job.schedule == "*/2 * * * *"
+
+      refute inserted_job.autoremove
+      refute inserted_job.last_error
+      refute inserted_job.last_failed_at
+      refute inserted_job.last_succeeded_at
+      refute inserted_job.max_retries
+      refute inserted_job.state
+    end
+
+    test "create_job/1 is defined on bare minimum example" do
+      {:ok, job} = ExampleMinimal.create_job()
+
+      inserted_job = @repo.one!(Job)
+
+      assert job.name == "CueTest.ExampleMinimal"
+      assert job.name == inserted_job.name
+      assert inserted_job.schedule == "*/2 * * * *"
+
+      refute inserted_job.autoremove
+      refute inserted_job.last_error
+      refute inserted_job.last_failed_at
+      refute inserted_job.last_succeeded_at
+      refute inserted_job.max_retries
+      refute inserted_job.state
+    end
+
+    test "create_job_unless_exists!/1 is defined on bare minimum example" do
+      job = ExampleMinimal.create_job_unless_exists!()
+
+      inserted_job = @repo.one!(Job)
+
+      assert job.name == "CueTest.ExampleMinimal"
+      assert job.name == inserted_job.name
+      assert inserted_job.schedule == "*/2 * * * *"
+
+      refute inserted_job.autoremove
+      refute inserted_job.last_error
+      refute inserted_job.last_failed_at
+      refute inserted_job.last_succeeded_at
+      refute inserted_job.max_retries
+      refute inserted_job.state
+    end
+
+    test "create_job_unless_exists/1 is defined on bare minimum example" do
+      {:ok, job} = ExampleMinimal.create_job_unless_exists()
+
+      inserted_job = @repo.one!(Job)
+
+      assert job.name == "CueTest.ExampleMinimal"
+      assert job.name == inserted_job.name
+      assert inserted_job.schedule == "*/2 * * * *"
+
+      refute inserted_job.autoremove
+      refute inserted_job.last_error
+      refute inserted_job.last_failed_at
+      refute inserted_job.last_succeeded_at
+      refute inserted_job.max_retries
+      refute inserted_job.state
+    end
+
+    test "options are merged in" do
+      job =
+        ExampleMinimal.create_job!(
+          schedule: "*/1 * * * *",
+          handler: Example,
+          repo: @repo,
+          name: "job",
+          max_retries: 5,
+          autoremove: true,
+          state: %{key: :value}
+        )
+
+      inserted_job = @repo.one!(Job)
+
+      assert job.name == "job"
+      assert job.name == inserted_job.name
+      assert inserted_job.schedule == "*/1 * * * *"
+      assert inserted_job.autoremove
+      assert inserted_job.max_retries == 5
+      assert inserted_job.state == %{key: :value}
     end
   end
 end
