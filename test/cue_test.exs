@@ -70,7 +70,7 @@ defmodule CueTest do
                  name: "job"
                )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.handler == Example
       assert inserted_job.name == job.name
@@ -88,7 +88,7 @@ defmodule CueTest do
     end
 
     test "other settings can be overridden" do
-      assert {:ok, job} =
+      assert {:ok, _job} =
                Cue.create_job(
                  schedule: "*/1 * * * *",
                  handler: Example,
@@ -99,7 +99,7 @@ defmodule CueTest do
                  state: %{key: :value}
                )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
@@ -115,7 +115,7 @@ defmodule CueTest do
         schedule: "*/1 * * * *"
       ]
 
-      assert {:ok, job} = Cue.create_job(params)
+      assert {:ok, _job} = Cue.create_job(params)
       assert {:error, {:job_exists, "job"}} = Cue.create_job(params)
     end
   end
@@ -175,7 +175,7 @@ defmodule CueTest do
                  name: "job"
                )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.handler == Example
       assert inserted_job.name == job.name
@@ -193,7 +193,7 @@ defmodule CueTest do
     end
 
     test "other settings can be overridden" do
-      assert {:ok, job} =
+      assert {:ok, _job} =
                Cue.create_job_unless_exists(
                  schedule: "*/1 * * * *",
                  handler: Example,
@@ -204,7 +204,7 @@ defmodule CueTest do
                  state: %{key: :value}
                )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
@@ -274,15 +274,15 @@ defmodule CueTest do
     end
 
     test "passes on necessary options and sets defaults" do
-      assert job =
-               Cue.create_job!(
-                 schedule: DateTime.utc_now(),
-                 handler: Example,
-                 repo: @repo,
-                 name: "job"
-               )
+      job =
+        Cue.create_job!(
+          schedule: DateTime.utc_now(),
+          handler: Example,
+          repo: @repo,
+          name: "job"
+        )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.handler == Example
       assert inserted_job.name == job.name
@@ -300,18 +300,17 @@ defmodule CueTest do
     end
 
     test "other settings can be overridden" do
-      assert job =
-               Cue.create_job!(
-                 schedule: "*/1 * * * *",
-                 handler: Example,
-                 repo: @repo,
-                 name: "job",
-                 max_retries: 5,
-                 autoremove: true,
-                 state: %{key: :value}
-               )
+      Cue.create_job!(
+        schedule: "*/1 * * * *",
+        handler: Example,
+        repo: @repo,
+        name: "job",
+        max_retries: 5,
+        autoremove: true,
+        state: %{key: :value}
+      )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
@@ -387,14 +386,15 @@ defmodule CueTest do
     end
 
     test "passes on necessary options and sets defaults" do
-      Cue.create_job_unless_exists!(
-        schedule: DateTime.utc_now(),
-        handler: Example,
-        repo: @repo,
-        name: "job"
-      )
+      job =
+        Cue.create_job_unless_exists!(
+          schedule: DateTime.utc_now(),
+          handler: Example,
+          repo: @repo,
+          name: "job"
+        )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.handler == Example
       assert inserted_job.name == job.name
@@ -422,7 +422,7 @@ defmodule CueTest do
         state: %{key: :value}
       )
 
-      inserted_job = @repo.one!(Cue.Job)
+      inserted_job = @repo.one!(Job)
 
       assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
