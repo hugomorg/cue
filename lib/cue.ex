@@ -63,6 +63,8 @@ defmodule Cue do
     state: nil
   ]
 
+  @no_conflict_opts [conflict_target: :name, on_conflict: :nothing]
+
   alias Cue.Job
 
   use Supervisor
@@ -114,38 +116,19 @@ defmodule Cue do
   """
   @spec create_job!(keyword()) :: create_job_return
   def create_job!(opts) do
-    validated_opts = Keyword.validate!(opts, @opts)
-
-    handler = validate_job_handler!(validated_opts[:handler])
-
-    unless Code.ensure_loaded?(validated_opts[:repo]),
-      do: raise(__MODULE__.Error, message: "No repo")
-
-    unless validated_opts[:name], do: raise(__MODULE__.Error, message: "No name")
-    unless is_binary(validated_opts[:name]), do: raise(__MODULE__.Error, message: "Invalid name")
-
-    state = Keyword.get_lazy(opts, :state, fn -> init_job(opts[:name], handler) end)
-
-    {schedule, run_at} = validate_schedule!(validated_opts[:schedule])
-
-    job =
-      %Job{}
-      |> Job.changeset(%{
-        name: validated_opts[:name],
-        handler: handler,
-        run_at: run_at,
-        schedule: schedule,
-        status: :not_started,
-        max_retries: validated_opts[:max_retries],
-        state: state,
-        autoremove: validated_opts[:autoremove] || false
-      })
-      |> validated_opts[:repo].insert!()
+    {changeset, validated_opts} = prepare_job!(opts)
+    job = validated_opts[:repo].insert!(changeset)
 
     %{name: job.name, run_at: job.run_at}
   end
 
-  @no_conflict_opts [conflict_target: :name, on_conflict: :nothing]
+  @spec create_job_unless_exists!(keyword()) :: create_job_return
+  def create_job_unless_exists!(opts) do
+    {changeset, validated_opts} = prepare_job!(opts)
+    job = validated_opts[:repo].insert!(changeset, @no_conflict_opts)
+
+    %{name: job.name, run_at: job.run_at}
+  end
 
   @doc """
   Same as `create_job!/1` but does not raise if there is an error.
@@ -251,6 +234,36 @@ defmodule Cue do
          state: state
        }), validated_opts}
     end
+  end
+
+  defp prepare_job!(opts) do
+    validated_opts = Keyword.validate!(opts, @opts)
+
+    handler = validate_job_handler!(validated_opts[:handler])
+
+    unless Code.ensure_loaded?(validated_opts[:repo]),
+      do: raise(__MODULE__.Error, message: "No repo")
+
+    unless validated_opts[:name], do: raise(__MODULE__.Error, message: "No name")
+    unless is_binary(validated_opts[:name]), do: raise(__MODULE__.Error, message: "Invalid name")
+
+    state = Keyword.get_lazy(opts, :state, fn -> init_job(opts[:name], handler) end)
+
+    {schedule, run_at} = validate_schedule!(validated_opts[:schedule])
+
+    job =
+      Job.changeset(%Job{}, %{
+        name: validated_opts[:name],
+        handler: handler,
+        run_at: run_at,
+        schedule: schedule,
+        status: :not_started,
+        max_retries: validated_opts[:max_retries],
+        state: state,
+        autoremove: validated_opts[:autoremove] || false
+      })
+
+    {job, validated_opts}
   end
 
   defp validate_name(nil), do: {:error, :no_name}
