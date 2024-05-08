@@ -219,7 +219,7 @@ defmodule Cue do
 
   If you wanted to clear out the European currency jobs you can simply call `Cue.remove_jobs_by(YourRepo, :name, ilike: "currency.europe%")`.
 
-  You can use the same matching patterns as `"LIKE"`/`"ILIKE"` database functions. If you want to be stricter with case, swap out `"ilike"` for `"like"`.
+  You can use the same matching patterns as `"LIKE"`/`"ILIKE"` database functions. If you want to be stricter with case, swap out `:ilike` for `:like`.
 
   Calling `Cue.remove_jobs_by(YourRepo, :name, name)` is the same as `Cue.remove_job/2`.
 
