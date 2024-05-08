@@ -7,6 +7,8 @@ defmodule Cue.Scheduler do
   @callback add_jobs_to_ignored([job_name()]) :: :ok
   @callback remove_job_from_ignored(job_name()) :: :ok
   @callback remove_jobs_from_ignored([job_name()]) :: :ok
+  @callback pause() :: :ok
+  @callback resume() :: :ok
 
   @implementation Application.compile_env!(:cue, :scheduler)
 
@@ -43,19 +45,27 @@ defmodule Cue.Scheduler do
       GenServer.call(__MODULE__, {:remove_jobs_from_ignored, job_names})
     end
 
+    def pause do
+      GenServer.call(__MODULE__, :pause)
+    end
+
+    def resume do
+      GenServer.call(__MODULE__, :resume)
+    end
+
     if @repo do
       ## GenServer callbacks
       @impl true
       def init(_args) do
         loop(:check, @check_every_seconds)
 
-        {:ok, %{ignore_jobs: []}}
+        {:ok, %{ignore_jobs: [], paused?: false}}
       end
     else
       @impl true
       def init(_args) do
         Logger.warn("No repo, scheduler will not loop")
-        {:ok, %{ignore_jobs: []}}
+        {:ok, %{ignore_jobs: [], paused?: false}}
       end
     end
 
@@ -77,6 +87,23 @@ defmodule Cue.Scheduler do
     @impl true
     def handle_call({:remove_jobs_from_ignored, job_names}, _from, state) do
       {:reply, :ok, %{state | ignore_jobs: state.ignore_jobs -- job_names}}
+    end
+
+    @impl true
+    def handle_call(:pause, _from, state) do
+      {:reply, :ok, %{state | paused?: true}}
+    end
+
+    @impl true
+    def handle_call(:resume, _from, state) do
+      {:reply, :ok, %{state | paused?: false}}
+    end
+
+    @impl true
+    def handle_info(:check, state = %{paused?: true}) do
+      loop(:check, @check_every_seconds)
+
+      {:noreply, state}
     end
 
     # Scheduling logic

@@ -178,6 +178,18 @@ defmodule Cue do
   end
 
   @doc """
+  Removes every single job in the database.
+  """
+  @spec remove_all_jobs(atom()) :: non_neg_integer()
+  def remove_all_jobs(repo) do
+    Cue.Scheduler.impl().pause()
+    {count, _returned} = repo.delete_all(Job)
+    Cue.Scheduler.impl().resume()
+
+    count
+  end
+
+  @doc """
   Deletes the job from the database.
 
   Accepts the repo and job name as arguments.

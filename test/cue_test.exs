@@ -582,6 +582,23 @@ defmodule CueTest do
     end
   end
 
+  describe "remove_all_jobs/1" do
+    test "deletes all jobs" do
+      expect(Cue.Scheduler.Mock, :pause, fn -> :ok end)
+      expect(Cue.Scheduler.Mock, :resume, fn -> :ok end)
+
+      params = [schedule: DateTime.utc_now(), handler: Example, repo: @repo, name: "job1"]
+      Cue.create_job!(params)
+      Cue.create_job!(Keyword.put(params, :name, "job2"))
+      Cue.create_job!(Keyword.put(params, :name, "job3"))
+      Cue.create_job!(Keyword.put(params, :name, "job4"))
+
+      assert Cue.remove_all_jobs(@repo) == 4
+
+      refute @repo.exists?(Job)
+    end
+  end
+
   describe "remove_job/2" do
     test "removes job by name and returns delete count" do
       expect(Cue.Scheduler.Mock, :add_job_to_ignored, fn "job" -> :ok end)
