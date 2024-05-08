@@ -261,14 +261,6 @@ defmodule Cue do
     count
   end
 
-  defp remove_jobs_by_name_query(query, %{ilike: pattern}) do
-    query |> where([j], ilike(j.name, ^pattern))
-  end
-
-  defp remove_jobs_by_name_query(query, %{like: pattern}) do
-    query |> where([j], like(j.name, ^pattern))
-  end
-
   def list_jobs(repo) do
     Job
     |> Ecto.Query.order_by(desc: :run_at)
@@ -295,6 +287,14 @@ defmodule Cue do
     else
       {:error, :no_repo}
     end
+  end
+
+  defp remove_jobs_by_name_query(query, %{ilike: pattern}) do
+    query |> where([j], ilike(j.name, ^pattern))
+  end
+
+  defp remove_jobs_by_name_query(query, %{like: pattern}) do
+    query |> where([j], like(j.name, ^pattern))
   end
 
   defp prepare_job(opts) do
