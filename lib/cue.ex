@@ -24,17 +24,19 @@ defmodule Cue do
   end
   ```
 
-  No options are required until you create the job.
+  No options (e.g. `schedule`) are required until you create the job.
 
   It is possible to override any/all of the "module options" whenever `create_job/1` or `create_job!/1` are called.
 
   There are two main types of functions which are defined on the module, to handle creating and removing jobs.
 
-  `YourApp.create_job/1` / `YourApp.create_job!/1` actually create the job at the database level. The job will not start running until this happens.
+  `YourApp.create_job/1` / `YourApp.create_job!/1` / `YourApp.create_job_unless_exists/1` / `YourApp.create_job_unless_exists!` actually create the job at the database level.
 
-  To remove a job, just call `YourApp.remove_job()` which defaults to the module name but if passed a name removes the corresponding job.
+  The job will not start running until this happens.
 
-  If you need further customisation, you can call `Cue.create_job/1` / `Cue.create_job!/1` / `Cue.remove_job/2`.
+  To remove all jobs created by the module, just call `YourApp.remove_jobs()`.
+
+  If you need more fine-grained control with removal, check out `Cue.remove_jobs_by/3`.
   """
 
   @type name :: String.t()
@@ -102,18 +104,19 @@ defmodule Cue do
 
   - `name`: must be a string, and unique across all jobs. Defaults to the module name.
 
-  - `state`: any Elixir term passed to the handler
+  - `state`: any Elixir term passed to the handler. This is useful if you want to track something across runs.
 
   - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
   Defaults to `false`.
 
   - `max_retries`: how many times the job should be retried in the event of a failure.
   The retry count gets reset after a successful run.
-  Defaults to `nil`, which means the job will keep retrying.
+  Defaults to `nil`, which means the job will retry infinitely, on its given schedule.
+  If the job is a "one-off" job, it will not get retried.
 
-  - `handler`: a loaded module which defines `handle_job/2` and `handle_job_error/3` callbacks
+  - `handler`: a module which should define `handle_job/2` and `handle_job_error/3` callbacks.
 
-  Returns the name of the job and the time the job will run next.
+  This function returns the name of the job and the time the job will run next.
   """
   @spec create_job!(keyword()) :: create_job_return
   def create_job!(opts) do
@@ -123,6 +126,15 @@ defmodule Cue do
     %{name: job.name, run_at: job.run_at}
   end
 
+  @doc """
+  Takes exactly the same options as `create_job!/1`.
+  The only difference here is that if the job already exists, there is no error raised.
+
+  This is really useful if you don't care whether the job exists or not.
+
+  This won't override any options. If you want to actually change a job's options
+  you should remove the job and re-create.
+  """
   @spec create_job_unless_exists!(keyword()) :: create_job_return
   def create_job_unless_exists!(opts) do
     {changeset, validated_opts} = prepare_job!(opts)
@@ -148,6 +160,9 @@ defmodule Cue do
     end
   end
 
+  @doc """
+  Same as `create_job_unless_exists!/1` but does not raise if there is an error.
+  """
   @spec create_job_unless_exists(keyword()) ::
           {:error, {atom(), String.t()}} | {:ok, create_job_return}
   def create_job_unless_exists(opts) do
@@ -166,6 +181,8 @@ defmodule Cue do
   Deletes the job from the database.
 
   Accepts the repo and job name as arguments.
+
+  Use this function is you want to remove a single job only.
   """
   @spec remove_job(atom(), name()) :: non_neg_integer()
   def remove_job(repo, job_name) do
@@ -182,6 +199,20 @@ defmodule Cue do
     count
   end
 
+  @doc """
+  This function can be used to remove multiple jobs.
+
+  For example, let's say you are namespacing your jobs, and a name pattern you have is: `"currency.europe.*"`. The `"*"` could be GBP, EUR etc.
+  And you might also have `"currency.americas.*"`.
+
+  If you wanted to clear out the European currency jobs you can simply call `Cue.remove_jobs_by(YourRepo, :name, ilike: "currency.europe%")`.
+
+  You can use the same matching patterns as `"LIKE"`/`"ILIKE"` database functions. If you want to be stricter with case, swap out `"ilike"` for `"like"`.
+
+  Calling `Cue.remove_jobs_by(YourRepo, :name, name)` is the same as `Cue.remove_job/2`.
+
+  Another thing you want to do is remove jobs by the given handler. For that you can use `Cue.remove_jobs_by(YourRepo, :handler, SomeHandler)`.
+  """
   def remove_jobs_by(repo, :name, name) when is_binary(name) do
     remove_job(repo, name)
   end
