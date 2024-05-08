@@ -42,7 +42,7 @@ defmodule CueTest do
   defmodule ExampleWithOpts do
     use Cue,
       name: "Hard worker",
-      schedule: "2/* * * * *",
+      schedule: "*/2 * * * *",
       autoremove: true,
       max_retries: 100
 
@@ -564,6 +564,21 @@ defmodule CueTest do
       assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.state == %{key: :value}
+    end
+
+    test "remove is defined and by default is scoped to jobs defined by module" do
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
+
+      job_1 = ExampleMinimal.create_job!(name: "job1")
+      job_2 = ExampleMinimal.create_job!(name: "job2")
+      job_3 = ExampleWithOpts.create_job!(name: "job3")
+
+      ExampleMinimal.remove_jobs()
+
+      refute @repo.get_by(Job, name: job_1.name)
+      refute @repo.get_by(Job, name: job_2.name)
+      assert @repo.get_by(Job, name: job_3.name)
     end
   end
 

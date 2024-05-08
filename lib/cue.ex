@@ -523,8 +523,8 @@ defmodule Cue do
 
       Uses the repo defined in config.
       """
-      def remove_job(name \\ @cue_name) do
-        Cue.remove_job(@repo, name)
+      def remove_jobs do
+        Cue.remove_jobs_by(@repo, :handler, __MODULE__)
       end
     end
   end
