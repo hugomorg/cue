@@ -26,7 +26,8 @@ defmodule Cue.MixProject do
       {:postgrex, "~> 0.17", only: [:test, :dev]},
       {:jason, "~> 1.4"},
       {:cron, "~> 0.1"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:hammox, "~> 0.7", only: :test}
     ]
   end
 

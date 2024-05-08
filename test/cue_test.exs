@@ -1,8 +1,13 @@
 defmodule CueTest do
+  alias Cue.Scheduler
   use Cue.DataCase
   doctest Cue
   @repo Cue.TestRepo
   alias Cue.Job
+
+  import Hammox
+
+  setup :verify_on_exit!
 
   defmodule NoCallbacks do
     use Cue
@@ -559,6 +564,99 @@ defmodule CueTest do
       assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.state == %{key: :value}
+    end
+  end
+
+  describe "remove_job/2" do
+    test "removes job by name and returns delete count" do
+      expect(Cue.Scheduler.Mock, :add_job_to_ignored, fn "job" -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_job_from_ignored, fn "job" -> :ok end)
+
+      assert job =
+               Cue.create_job!(
+                 schedule: DateTime.utc_now(),
+                 handler: Example,
+                 repo: @repo,
+                 name: "job"
+               )
+
+      assert Cue.remove_job(@repo, job.name) == 1
+
+      refute @repo.exists?(Job)
+    end
+  end
+
+  describe "remove_job_by/3" do
+    test "removes job by name if given string" do
+      expect(Cue.Scheduler.Mock, :add_job_to_ignored, fn "job" -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_job_from_ignored, fn "job" -> :ok end)
+
+      assert job =
+               Cue.create_job!(
+                 schedule: DateTime.utc_now(),
+                 handler: Example,
+                 repo: @repo,
+                 name: "job"
+               )
+
+      assert Cue.remove_jobs_by(@repo, :name, job.name) == 1
+
+      refute @repo.exists?(Job)
+    end
+
+    test "supports like patterns for name" do
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
+      params = [schedule: DateTime.utc_now(), handler: Example, repo: @repo, name: "job1"]
+      job_1 = Cue.create_job!(params)
+      job_2 = Cue.create_job!(Keyword.put(params, :name, "job2"))
+      job_3 = Cue.create_job!(Keyword.put(params, :name, "JOB3"))
+      job_4 = Cue.create_job!(Keyword.put(params, :name, "4job"))
+
+      assert Cue.remove_jobs_by(@repo, :name, like: "job%") == 2
+
+      refute @repo.get_by(Job, name: job_1.name)
+      refute @repo.get_by(Job, name: job_2.name)
+      assert @repo.get_by(Job, name: job_3.name)
+      assert @repo.get_by(Job, name: job_4.name)
+    end
+
+    test "supports ilike patterns for name" do
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2", "JOB3"] -> :ok end)
+
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2", "JOB3"] -> :ok end)
+
+      params = [schedule: DateTime.utc_now(), handler: Example, repo: @repo, name: "job1"]
+      job_1 = Cue.create_job!(params)
+      job_2 = Cue.create_job!(Keyword.put(params, :name, "job2"))
+      job_3 = Cue.create_job!(Keyword.put(params, :name, "JOB3"))
+      job_4 = Cue.create_job!(Keyword.put(params, :name, "4job"))
+
+      assert Cue.remove_jobs_by(@repo, :name, ilike: "job%") == 3
+
+      refute @repo.get_by(Job, name: job_1.name)
+      refute @repo.get_by(Job, name: job_2.name)
+      refute @repo.get_by(Job, name: job_3.name)
+      assert @repo.get_by(Job, name: job_4.name)
+    end
+
+    test "deletes by handler" do
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
+
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
+
+      params = [schedule: DateTime.utc_now(), handler: Example, repo: @repo, name: "job1"]
+      job_1 = Cue.create_job!(params)
+      job_2 = Cue.create_job!(Keyword.put(params, :name, "job2"))
+      job_3 = Cue.create_job!(Keyword.merge(params, name: "job3", handler: ExampleWithOpts))
+      job_4 = Cue.create_job!(Keyword.merge(params, name: "job4", handler: ExampleWithOpts))
+
+      assert Cue.remove_jobs_by(@repo, :handler, Example) == 2
+
+      refute @repo.get_by(Job, name: job_1.name)
+      refute @repo.get_by(Job, name: job_2.name)
+      assert @repo.get_by(Job, name: job_3.name)
+      assert @repo.get_by(Job, name: job_4.name)
     end
   end
 end

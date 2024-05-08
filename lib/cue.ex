@@ -66,6 +66,7 @@ defmodule Cue do
   @no_conflict_opts [conflict_target: :name, on_conflict: :nothing]
 
   alias Cue.Job
+  import Ecto.Query
 
   use Supervisor
 
@@ -168,24 +169,76 @@ defmodule Cue do
   """
   @spec remove_job(atom(), name()) :: non_neg_integer()
   def remove_job(repo, job_name) do
-    require Ecto.Query
-
     # Synchronously remove job from scheduling/processing
-    Cue.Scheduler.add_job_to_ignored(job_name)
+    Cue.Scheduler.impl().add_job_to_ignored(job_name)
 
     {count, _returned} =
       Job
       |> Ecto.Query.where(name: ^job_name)
       |> repo.delete_all()
 
-    Cue.Scheduler.remove_job_from_ignored(job_name)
+    Cue.Scheduler.impl().remove_job_from_ignored(job_name)
 
     count
   end
 
-  def list_jobs(repo) do
-    require Ecto.Query
+  def remove_jobs_by(repo, :name, name) when is_binary(name) do
+    remove_job(repo, name)
+  end
 
+  def remove_jobs_by(repo, :name, opts) when is_list(opts) do
+    remove_jobs_by(repo, :name, Map.new(opts))
+  end
+
+  def remove_jobs_by(repo, :name, opts = %{}) do
+    jobs =
+      Job
+      |> remove_jobs_by_name_query(opts)
+      |> repo.all()
+
+    job_names = Enum.map(jobs, & &1.name)
+
+    Cue.Scheduler.impl().add_jobs_to_ignored(job_names)
+
+    {count, _returned} =
+      Job
+      |> where([j], j.id in ^Enum.map(jobs, & &1.id))
+      |> repo.delete_all()
+
+    Cue.Scheduler.impl().remove_jobs_from_ignored(job_names)
+
+    count
+  end
+
+  def remove_jobs_by(repo, :handler, handler) when is_atom(handler) do
+    jobs =
+      Job
+      |> where(handler: ^handler)
+      |> repo.all()
+
+    job_names = Enum.map(jobs, & &1.name)
+
+    Cue.Scheduler.impl().add_jobs_to_ignored(job_names)
+
+    {count, _returned} =
+      Job
+      |> where([j], j.id in ^Enum.map(jobs, & &1.id))
+      |> repo.delete_all()
+
+    Cue.Scheduler.impl().remove_jobs_from_ignored(job_names)
+
+    count
+  end
+
+  defp remove_jobs_by_name_query(query, %{ilike: pattern}) do
+    query |> where([j], ilike(j.name, ^pattern))
+  end
+
+  defp remove_jobs_by_name_query(query, %{like: pattern}) do
+    query |> where([j], like(j.name, ^pattern))
+  end
+
+  def list_jobs(repo) do
     Job
     |> Ecto.Query.order_by(desc: :run_at)
     |> Ecto.Query.select([j], %{
