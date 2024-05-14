@@ -618,25 +618,8 @@ defmodule CueTest do
     end
   end
 
-  describe "remove_job_by/3" do
-    test "removes job by name if given string" do
-      expect(Cue.Scheduler.Mock, :add_job_to_ignored, fn "job" -> :ok end)
-      expect(Cue.Scheduler.Mock, :remove_job_from_ignored, fn "job" -> :ok end)
-
-      assert job =
-               Cue.create_job!(
-                 schedule: DateTime.utc_now(),
-                 handler: Example,
-                 repo: @repo,
-                 name: "job"
-               )
-
-      assert Cue.remove_jobs_by(@repo, :name, job.name) == 1
-
-      refute @repo.exists?(Job)
-    end
-
-    test "supports like patterns for name" do
+  describe "remove_jobs/2" do
+    test "supports like patterns" do
       expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
       expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
       params = [schedule: DateTime.utc_now(), handler: Example, repo: @repo, name: "job1"]
@@ -645,7 +628,7 @@ defmodule CueTest do
       job_3 = Cue.create_job!(Keyword.put(params, :name, "JOB3"))
       job_4 = Cue.create_job!(Keyword.put(params, :name, "4job"))
 
-      assert Cue.remove_jobs_by(@repo, :name, like: "job%") == 2
+      assert Cue.remove_jobs(@repo, where: [name: [like: "job%"]]) == 2
 
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
@@ -653,7 +636,7 @@ defmodule CueTest do
       assert @repo.get_by(Job, name: job_4.name)
     end
 
-    test "supports ilike patterns for name" do
+    test "supports ilike patterns" do
       expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2", "JOB3"] -> :ok end)
 
       expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2", "JOB3"] -> :ok end)
@@ -664,7 +647,7 @@ defmodule CueTest do
       job_3 = Cue.create_job!(Keyword.put(params, :name, "JOB3"))
       job_4 = Cue.create_job!(Keyword.put(params, :name, "4job"))
 
-      assert Cue.remove_jobs_by(@repo, :name, ilike: "job%") == 3
+      assert Cue.remove_jobs(@repo, where: [name: [ilike: "job%"]]) == 3
 
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
@@ -672,7 +655,7 @@ defmodule CueTest do
       assert @repo.get_by(Job, name: job_4.name)
     end
 
-    test "deletes by handler" do
+    test "deletes by exact match" do
       expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
 
       expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
@@ -683,7 +666,7 @@ defmodule CueTest do
       job_3 = Cue.create_job!(Keyword.merge(params, name: "job3", handler: ExampleWithOpts))
       job_4 = Cue.create_job!(Keyword.merge(params, name: "job4", handler: ExampleWithOpts))
 
-      assert Cue.remove_jobs_by(@repo, :handler, Example) == 2
+      assert Cue.remove_jobs(@repo, where: [handler: Example]) == 2
 
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
@@ -691,4 +674,124 @@ defmodule CueTest do
       assert @repo.get_by(Job, name: job_4.name)
     end
   end
+
+  describe "list_jobs/2" do
+    test "by default lists all jobs sorted by run at" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      expected_job_3 = make_job!(run_at: now)
+      expected_job_2 = make_job!(run_at: now_plus_1)
+      expected_job_1 = make_job!(run_at: now_plus_2)
+
+      assert [job_1, job_2, job_3] = Cue.list_jobs(@repo)
+
+      assert job_1.name == expected_job_1.name
+      assert job_2.name == expected_job_2.name
+      assert job_3.name == expected_job_3.name
+    end
+
+    test "ordering can be one or many fields" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      expected_job_3 = make_job!(run_at: now, name: "2")
+      expected_job_2 = make_job!(run_at: now, name: "1")
+      expected_job_1 = make_job!(run_at: now_plus_1, name: "3")
+
+      assert [job_1, job_2, job_3] = Cue.list_jobs(@repo, order_by: [desc: :run_at, asc: :name])
+
+      assert job_1.name == expected_job_1.name
+      assert job_2.name == expected_job_2.name
+      assert job_3.name == expected_job_3.name
+    end
+
+    list_jobs(YourRepo,
+      where: [status: :failed, name: [ilike: "fx.%"]],
+      order_by: [desc: :failed_at, asc: :name]
+    )
+
+    test "filters by pattern - ilike" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      job_1 = make_job!(run_at: now, name: "job-1")
+      make_job!(run_at: now, name: "job-2")
+
+      assert [job] = Cue.list_jobs(@repo, order_by: :name, where: [name: [ilike: "%1"]])
+
+      assert job_1.name == job.name
+    end
+
+    test "filters by pattern - like" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      job_1 = make_job!(run_at: now, name: "JOB-1")
+      make_job!(run_at: now, name: "job-2")
+
+      assert [job] = Cue.list_jobs(@repo, order_by: :name, where: [name: [like: "JOB%"]])
+
+      assert job_1.name == job.name
+    end
+
+    test "filters by list" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      failed_job = make_job!(run_at: now, name: "job-1", status: :failed)
+      successful_job = make_job!(run_at: now, name: "job-2", status: :succeeded)
+      make_job!(run_at: now, name: "job-3")
+
+      assert [job_1, job_2] =
+               Cue.list_jobs(@repo, order_by: :name, where: [status: [:failed, :succeeded]])
+
+      assert job_1.name == failed_job.name
+      assert job_2.name == successful_job.name
+    end
+
+    test "filters by exact match" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      failed_job = make_job!(run_at: now, name: "job-1", status: :failed, last_error: "hello")
+      make_job!(run_at: now, name: "job-2")
+
+      assert [job_1] = Cue.list_jobs(@repo, order_by: :name, where: [last_error: "hello"])
+
+      assert job_1.name == failed_job.name
+    end
+  end
+
+  defp make_job!(opts \\ [])
+
+  defp make_job!(opts) when is_list(opts) do
+    opts |> Map.new() |> make_job!()
+  end
+
+  defp make_job!(opts) do
+    params =
+      Map.merge(
+        %{
+          schedule: "* * * * *",
+          handler: Example,
+          repo: @repo,
+          name: "job-#{unique_id()}",
+          status: :not_started
+        },
+        opts
+      )
+
+    %Job{}
+    |> Job.changeset(params)
+    |> @repo.insert!()
+  end
+
+  defp unique_id, do: System.unique_integer([:positive, :monotonic])
 end

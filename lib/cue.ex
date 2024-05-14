@@ -212,31 +212,25 @@ defmodule Cue do
   end
 
   @doc """
-  This function can be used to remove multiple jobs.
+  This function can be used to remove multiple jobs by some condition.
 
   For example, let's say you are namespacing your jobs, and a name pattern you have is: `"currency.europe.*"`. The `"*"` could be GBP, EUR etc.
   And you might also have `"currency.americas.*"`.
 
-  If you wanted to clear out the European currency jobs you can simply call `Cue.remove_jobs_by(YourRepo, :name, ilike: "currency.europe%")`.
+  If you wanted to clear out the European currency jobs you can simply call `Cue.remove_jobs(YourRepo, where: [name: [ilike: "currency.europe%"]])`.
 
   You can use the same matching patterns as `"LIKE"`/`"ILIKE"` database functions. If you want to be stricter with case, swap out `:ilike` for `:like`.
 
-  Calling `Cue.remove_jobs_by(YourRepo, :name, name)` is the same as `Cue.remove_job/2`.
+  Another thing you want to do is remove jobs by the given handler. For that you can use `Cue.remove_jobs(YourRepo, where: [handler: SomeHandler])`. Or more simply, `SomeHandler.remove_jobs()`.
 
-  Another thing you want to do is remove jobs by the given handler. For that you can use `Cue.remove_jobs_by(YourRepo, :handler, SomeHandler)`.
+  For more information about filtering, see `list_jobs/2` below.
   """
-  def remove_jobs_by(repo, :name, name) when is_binary(name) do
-    remove_job(repo, name)
-  end
+  def remove_jobs(repo, opts) when is_list(opts) do
+    where = Keyword.fetch!(opts, :where)
 
-  def remove_jobs_by(repo, :name, opts) when is_list(opts) do
-    remove_jobs_by(repo, :name, Map.new(opts))
-  end
-
-  def remove_jobs_by(repo, :name, opts = %{}) do
     jobs =
       Job
-      |> remove_jobs_by_name_query(opts)
+      |> maybe_filter_query(where)
       |> repo.all()
 
     job_names = Enum.map(jobs, & &1.name)
@@ -253,42 +247,54 @@ defmodule Cue do
     count
   end
 
-  def remove_jobs_by(repo, :handler, handler) when is_atom(handler) do
-    jobs =
-      Job
-      |> where(handler: ^handler)
-      |> repo.all()
+  @doc """
+  Returns all jobs. You can add some filtering conditions to narrow down the search and also change the order.
 
-    job_names = Enum.map(jobs, & &1.name)
+  Let's use some examples. If you wanted to find only failed jobs, that had the name matching the wildcard `"fx.*"`, sorted by `last_failed_at` and then name, you could do:
 
-    Cue.Scheduler.impl().add_jobs_to_ignored(job_names)
+  ```
+  list_jobs(YourRepo,
+    where: [status: :failed, name: [ilike: "fx.%"]],
+    order_by: [desc: :failed_at, asc: :name]
+  )
+  ```
+  """
+  @spec list_jobs(atom(), list()) :: [
+          %{
+            autoremove: boolean(),
+            handler: atom(),
+            last_error: nil | String.t(),
+            last_failed_at: DateTime.t(),
+            last_succeeded_at: DateTime.t(),
+            max_retries: non_neg_integer(),
+            name: String.t(),
+            retry_count: non_neg_integer(),
+            run_at: DateTime.t(),
+            schedule: nil | String.t(),
+            state: any(),
+            status: :not_started | :processing | :failed | :succeeded | :paused
+          }
+        ]
+  def list_jobs(repo, opts \\ []) do
+    order_by = Keyword.get(opts, :order_by, desc: :run_at)
+    where = Keyword.get(opts, :where)
 
-    {count, _returned} =
-      Job
-      |> where([j], j.id in ^Enum.map(jobs, & &1.id))
-      |> repo.delete_all()
-
-    Cue.Scheduler.impl().remove_jobs_from_ignored(job_names)
-
-    count
-  end
-
-  def list_jobs(repo) do
     Job
-    |> Ecto.Query.order_by(desc: :run_at)
-    |> Ecto.Query.select([j], %{
-      run_at: j.run_at,
-      retry_count: j.retry_count,
+    |> order_by(^order_by)
+    |> maybe_filter_query(where)
+    |> select([j], %{
+      autoremove: j.autoremove,
+      handler: j.handler,
+      last_error: j.last_error,
       last_failed_at: j.last_failed_at,
       last_succeeded_at: j.last_succeeded_at,
-      last_error: j.last_error,
       max_retries: j.max_retries,
-      autoremove: j.autoremove,
-      state: j.state,
-      status: j.status,
+      name: j.name,
+      retry_count: j.retry_count,
+      run_at: j.run_at,
       schedule: j.schedule,
-      handler: j.handler,
-      name: j.name
+      state: j.state,
+      status: j.status
     })
     |> repo.all()
   end
@@ -301,12 +307,47 @@ defmodule Cue do
     end
   end
 
-  defp remove_jobs_by_name_query(query, %{ilike: pattern}) do
-    query |> where([j], ilike(j.name, ^pattern))
+  defp maybe_filter_query(query, nil) do
+    query
   end
 
-  defp remove_jobs_by_name_query(query, %{like: pattern}) do
-    query |> where([j], like(j.name, ^pattern))
+  # Recursively build where expressions
+  defp maybe_filter_query(query, where) when is_list(where) do
+    Enum.reduce(where, query, fn cond, q ->
+      maybe_filter_query(q, cond)
+    end)
+  end
+
+  defp maybe_filter_query(query, {key, [ilike: pattern]}) do
+    where(query, [j], ilike(field(j, ^key), ^pattern))
+  end
+
+  defp maybe_filter_query(query, {key, [like: pattern]}) do
+    where(query, [j], like(field(j, ^key), ^pattern))
+  end
+
+  defp maybe_filter_query(query, {key, [gt: gt]}) do
+    where(query, [j], field(j, ^key) > ^gt)
+  end
+
+  defp maybe_filter_query(query, {key, [gte: gte]}) do
+    where(query, [j], field(j, ^key) >= ^gte)
+  end
+
+  defp maybe_filter_query(query, {key, [lt: lt]}) do
+    where(query, [j], field(j, ^key) < ^lt)
+  end
+
+  defp maybe_filter_query(query, {key, [lte: lte]}) do
+    where(query, [j], field(j, ^key) <= ^lte)
+  end
+
+  defp maybe_filter_query(query, {key, value}) when is_list(value) do
+    where(query, [j], field(j, ^key) in ^value)
+  end
+
+  defp maybe_filter_query(query, {key, value}) do
+    where(query, [j], field(j, ^key) == ^value)
   end
 
   defp prepare_job(opts) do
@@ -567,7 +608,7 @@ defmodule Cue do
       Uses the repo defined in config.
       """
       def remove_jobs do
-        Cue.remove_jobs_by(@repo, :handler, __MODULE__)
+        Cue.remove_jobs(@repo, where: [handler: __MODULE__])
       end
     end
   end
