@@ -517,9 +517,7 @@ defmodule Cue do
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       @doc """
-      Inserts a job in the database.
-
-      The options passed are merged into the module options.
+      Same as `Cue.create_job!/1` but the options passed are merged into the options when specifying `use`.
 
       For example if you had defined:
 
@@ -532,22 +530,11 @@ defmodule Cue do
 
       Then you could override the schedule on a per-job basis with `YourApp.create_job!(name: "some name", schedule: DateTime.utc_now())`.
 
-      Options:
-
-      - `schedule`: a string representing a cron specification, or a UTC `DateTime` value.
-      If it is the latter, it means the job will only be processed once, at that given time.
-      If a cron spec, the job will be repeated.
-
-      - `name`: must be a string, and unique across all jobs. Defaults to the module name.
-
-      - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
-      Defaults to `false`.
-
-      - `max_retries`: how many times the job should be retried in the event of a failure.
-      The retry count gets reset after a successful run.
-      Defaults to `nil`, which means the job will keep retrying.
+      The options that can be specified at the "module" level are `name`, `schedule`, `autoremove` and `max_retries`.
 
       The repo used is the one defined in the config.
+
+      Otherwise the behaviour is the same as `Cue.create_job!/1`.
       """
       def create_job!(opts \\ []) do
         [
@@ -563,7 +550,7 @@ defmodule Cue do
       end
 
       @doc """
-      Same as `create_job!/1`, but does not raise, returning `{:error, reason}` if there is a problem.
+      Same things described in `create_job!/1` apply here, but we don't raise, as with `Cue.create_job/1`.
       """
       def create_job(opts \\ []) do
         [
@@ -578,6 +565,9 @@ defmodule Cue do
         |> Cue.create_job()
       end
 
+      @doc """
+      Same things described in `create_job!/1` apply here, but we don't raise on name conflict, as with `Cue.create_job_unless_exists!/1`.
+      """
       def create_job_unless_exists!(opts \\ []) do
         [
           handler: __MODULE__,
@@ -591,6 +581,9 @@ defmodule Cue do
         |> Cue.create_job_unless_exists!()
       end
 
+      @doc """
+      Same things described in `create_job!/1` apply here, but we don't raise on name conflict, as with `Cue.create_job_unless_exists/1`.
+      """
       def create_job_unless_exists(opts \\ []) do
         [
           handler: __MODULE__,
@@ -617,7 +610,7 @@ defmodule Cue do
       end
 
       @doc """
-      Lists all jobs for this handler.
+      Lists all jobs for this handler. Can filter further as described in `Cue.list_jobs/1`.
       """
       def list_jobs(opts \\ []) do
         default_where_opts = [handler: __MODULE__]
