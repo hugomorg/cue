@@ -629,7 +629,7 @@ defmodule CueTest do
     end
   end
 
-  describe "remove_jobs/2" do
+  describe "remove_jobs/1" do
     test "supports like patterns" do
       expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
       expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
@@ -639,7 +639,7 @@ defmodule CueTest do
       job_3 = Cue.create_job!(Keyword.put(params, :name, "JOB3"))
       job_4 = Cue.create_job!(Keyword.put(params, :name, "4job"))
 
-      assert Cue.remove_jobs(@repo, where: [name: [like: "job%"]]) == 2
+      assert Cue.remove_jobs(where: [name: [like: "job%"]]) == 2
 
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
@@ -658,7 +658,7 @@ defmodule CueTest do
       job_3 = Cue.create_job!(Keyword.put(params, :name, "JOB3"))
       job_4 = Cue.create_job!(Keyword.put(params, :name, "4job"))
 
-      assert Cue.remove_jobs(@repo, where: [name: [ilike: "job%"]]) == 3
+      assert Cue.remove_jobs(where: [name: [ilike: "job%"]]) == 3
 
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
@@ -677,7 +677,7 @@ defmodule CueTest do
       job_3 = Cue.create_job!(Keyword.merge(params, name: "job3", handler: ExampleWithOpts))
       job_4 = Cue.create_job!(Keyword.merge(params, name: "job4", handler: ExampleWithOpts))
 
-      assert Cue.remove_jobs(@repo, where: [handler: Example]) == 2
+      assert Cue.remove_jobs(where: [handler: Example]) == 2
 
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
@@ -686,7 +686,7 @@ defmodule CueTest do
     end
   end
 
-  describe "list_jobs/2" do
+  describe "list_jobs/1" do
     test "by default lists all jobs sorted by run at" do
       now = DateTime.utc_now()
       now_plus_1 = now |> DateTime.add(1)
@@ -696,7 +696,7 @@ defmodule CueTest do
       expected_job_2 = make_job!(run_at: now_plus_1)
       expected_job_1 = make_job!(run_at: now_plus_2)
 
-      assert [job_1, job_2, job_3] = Cue.list_jobs(@repo)
+      assert [job_1, job_2, job_3] = Cue.list_jobs()
 
       assert job_1.name == expected_job_1.name
       assert job_2.name == expected_job_2.name
@@ -712,7 +712,7 @@ defmodule CueTest do
       expected_job_2 = make_job!(run_at: now, name: "1")
       expected_job_1 = make_job!(run_at: now_plus_1, name: "3")
 
-      assert [job_1, job_2, job_3] = Cue.list_jobs(@repo, order_by: [desc: :run_at, asc: :name])
+      assert [job_1, job_2, job_3] = Cue.list_jobs(order_by: [desc: :run_at, asc: :name])
 
       assert job_1.name == expected_job_1.name
       assert job_2.name == expected_job_2.name
@@ -727,7 +727,7 @@ defmodule CueTest do
       job_1 = make_job!(run_at: now, name: "job-1")
       make_job!(run_at: now, name: "job-2")
 
-      assert [job] = Cue.list_jobs(@repo, order_by: :name, where: [name: [ilike: "%1"]])
+      assert [job] = Cue.list_jobs(order_by: :name, where: [name: [ilike: "%1"]])
 
       assert job_1.name == job.name
     end
@@ -740,7 +740,7 @@ defmodule CueTest do
       job_1 = make_job!(run_at: now, name: "JOB-1")
       make_job!(run_at: now, name: "job-2")
 
-      assert [job] = Cue.list_jobs(@repo, order_by: :name, where: [name: [like: "JOB%"]])
+      assert [job] = Cue.list_jobs(order_by: :name, where: [name: [like: "JOB%"]])
 
       assert job_1.name == job.name
     end
@@ -755,7 +755,7 @@ defmodule CueTest do
       make_job!(run_at: now, name: "job-3")
 
       assert [job_1, job_2] =
-               Cue.list_jobs(@repo, order_by: :name, where: [status: [:failed, :succeeded]])
+               Cue.list_jobs(order_by: :name, where: [status: [:failed, :succeeded]])
 
       assert job_1.name == failed_job.name
       assert job_2.name == successful_job.name
@@ -769,7 +769,7 @@ defmodule CueTest do
       failed_job = make_job!(run_at: now, name: "job-1", status: :failed, last_error: "hello")
       make_job!(run_at: now, name: "job-2")
 
-      assert [job_1] = Cue.list_jobs(@repo, order_by: :name, where: [last_error: "hello"])
+      assert [job_1] = Cue.list_jobs(order_by: :name, where: [last_error: "hello"])
 
       assert job_1.name == failed_job.name
     end
@@ -784,7 +784,7 @@ defmodule CueTest do
       job_3 = make_job!(run_at: now_plus_2, name: "job-3")
 
       assert [job] =
-               Cue.list_jobs(@repo,
+               Cue.list_jobs(
                  order_by: :name,
                  where: [run_at: [<: now_plus_1]]
                )
@@ -792,7 +792,7 @@ defmodule CueTest do
       assert job.name == job_1.name
 
       assert [job] =
-               Cue.list_jobs(@repo,
+               Cue.list_jobs(
                  order_by: :name,
                  where: [run_at: [<=: now]]
                )
@@ -800,7 +800,7 @@ defmodule CueTest do
       assert job.name == job_1.name
 
       assert [job] =
-               Cue.list_jobs(@repo,
+               Cue.list_jobs(
                  order_by: :name,
                  where: [run_at: [>: now_plus_1]]
                )
@@ -808,7 +808,7 @@ defmodule CueTest do
       assert job.name == job_3.name
 
       assert [job] =
-               Cue.list_jobs(@repo,
+               Cue.list_jobs(
                  order_by: :name,
                  where: [run_at: [>=: now_plus_2]]
                )

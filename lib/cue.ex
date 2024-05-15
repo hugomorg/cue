@@ -72,6 +72,8 @@ defmodule Cue do
 
   use Supervisor
 
+  def repo, do: Application.fetch_env!(:cue, :repo)
+
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
@@ -180,8 +182,9 @@ defmodule Cue do
   @doc """
   Removes every single job in the database.
   """
+  @spec remove_all_jobs() :: non_neg_integer()
   @spec remove_all_jobs(atom()) :: non_neg_integer()
-  def remove_all_jobs(repo) do
+  def remove_all_jobs(repo \\ repo()) do
     Cue.Scheduler.impl().pause()
     {count, _returned} = repo.delete_all(Job)
     Cue.Scheduler.impl().resume()
@@ -196,8 +199,9 @@ defmodule Cue do
 
   Use this function is you want to remove a single job only.
   """
+  @spec remove_job(name()) :: non_neg_integer()
   @spec remove_job(atom(), name()) :: non_neg_integer()
-  def remove_job(repo, job_name) do
+  def remove_job(repo \\ repo(), job_name) do
     # Synchronously remove job from scheduling/processing
     Cue.Scheduler.impl().add_job_to_ignored(job_name)
 
@@ -225,7 +229,9 @@ defmodule Cue do
 
   For more information about filtering, see `list_jobs/2` below.
   """
-  def remove_jobs(repo, opts) when is_list(opts) do
+  @spec remove_jobs(keyword()) :: non_neg_integer()
+  def remove_jobs(opts) when is_list(opts) do
+    repo = Keyword.get(opts, :repo, repo())
     where = Keyword.fetch!(opts, :where)
 
     jobs =
@@ -263,7 +269,7 @@ defmodule Cue do
 
   You might need to drop down to Ecto queries direct to do something more custom.
   """
-  @spec list_jobs(atom(), list()) :: [
+  @spec list_jobs(list()) :: [
           %{
             autoremove: boolean(),
             handler: atom(),
@@ -279,9 +285,10 @@ defmodule Cue do
             status: :not_started | :processing | :failed | :succeeded | :paused
           }
         ]
-  def list_jobs(repo, opts \\ []) do
+  def list_jobs(opts \\ []) do
     order_by = Keyword.get(opts, :order_by, desc: :run_at)
     where = Keyword.get(opts, :where)
+    repo = Keyword.get(opts, :repo, repo())
 
     Job
     |> order_by(^order_by)
@@ -513,7 +520,7 @@ defmodule Cue do
 
     quote do
       @behaviour Cue
-      @repo Application.compile_env(:cue, :repo)
+      @repo Application.compile_env!(:cue, :repo)
       @cue_name unquote(name) || String.replace("#{__MODULE__}", ~r/^Elixir\./, "")
 
       @doc """
@@ -601,24 +608,25 @@ defmodule Cue do
       Removes all jobs for this handler. You can filter further by options described in `Cue.remove_jobs/2`.
       """
       def remove_jobs(opts \\ []) do
-        default_where_opts = [handler: __MODULE__]
-
-        merged_opts =
-          Keyword.update(opts, :where, default_where_opts, &Keyword.merge(&1, default_where_opts))
-
-        Cue.remove_jobs(@repo, merged_opts)
+        opts |> merge_with_module_defaults() |> Cue.remove_jobs()
       end
 
       @doc """
       Lists all jobs for this handler. Can filter further as described in `Cue.list_jobs/1`.
       """
       def list_jobs(opts \\ []) do
-        default_where_opts = [handler: __MODULE__]
+        opts |> merge_with_module_defaults() |> Cue.list_jobs()
+      end
+
+      defp merge_with_module_defaults(opts \\ []) do
+        default_opts = [repo: @repo, where: [handler: __MODULE__]]
 
         merged_opts =
-          Keyword.update(opts, :where, default_where_opts, &Keyword.merge(&1, default_where_opts))
-
-        Cue.list_jobs(@repo, merged_opts)
+          Keyword.merge(opts, default_opts, fn
+            # Preserve handler filter
+            :where, incoming, default -> Keyword.merge(incoming, default)
+            k, v1, v2 -> v2
+          end)
       end
     end
   end
