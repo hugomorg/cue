@@ -605,14 +605,15 @@ defmodule Cue do
       end
 
       @doc """
-      Deletes the job from the database.
-
-      Assumes name is the module name, unless a name is provided.
-
-      Uses the repo defined in config.
+      Removes all jobs for this handler. You can filter further by options described in `Cue.remove_jobs/2`.
       """
-      def remove_jobs do
-        Cue.remove_jobs(@repo, where: [handler: __MODULE__])
+      def remove_jobs(opts \\ []) do
+        default_where_opts = [handler: __MODULE__]
+
+        merged_opts =
+          Keyword.update(opts, :where, default_where_opts, &Keyword.merge(&1, default_where_opts))
+
+        Cue.remove_jobs(@repo, merged_opts)
       end
 
       @doc """

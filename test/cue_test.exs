@@ -567,29 +567,29 @@ defmodule CueTest do
     end
 
     test "remove is defined and by default is scoped to jobs defined by module" do
-      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ["job1", "job2"] -> :ok end)
-      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ["job1", "job2"] -> :ok end)
+      deleted_jobs = ["job2a"]
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ^deleted_jobs -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ^deleted_jobs -> :ok end)
 
       job_1 = ExampleMinimal.create_job!(name: "job1")
-      job_2 = ExampleMinimal.create_job!(name: "job2")
-      job_3 = ExampleWithOpts.create_job!(name: "job3")
+      job_2a = ExampleMinimal.create_job!(name: "job2a")
+      job_2b = ExampleWithOpts.create_job!(name: "job2b")
 
-      ExampleMinimal.remove_jobs()
+      ExampleMinimal.remove_jobs(where: [name: [like: "%2%"]])
 
-      refute @repo.get_by(Job, name: job_1.name)
-      refute @repo.get_by(Job, name: job_2.name)
-      assert @repo.get_by(Job, name: job_3.name)
+      assert @repo.get_by(Job, name: job_1.name)
+      refute @repo.get_by(Job, name: job_2a.name)
+      assert @repo.get_by(Job, name: job_2b.name)
     end
 
     test "list_jobs is defined and by default is scoped to jobs defined by module" do
-      job_1 = ExampleMinimal.create_job!(name: "job1")
-      job_2 = ExampleMinimal.create_job!(name: "job2")
-      _job_3 = ExampleWithOpts.create_job!(name: "job3")
+      _job_1 = ExampleMinimal.create_job!(name: "job1")
+      job_2a = ExampleMinimal.create_job!(name: "job2a")
+      _job_2b = ExampleWithOpts.create_job!(name: "job2b")
 
-      [returned_job_1, returned_job_2] = ExampleMinimal.list_jobs()
+      [returned_job] = ExampleMinimal.list_jobs(where: [name: [like: "%2%"]])
 
-      assert returned_job_1.name == job_1.name
-      assert returned_job_2.name == job_2.name
+      assert returned_job.name == job_2a.name
     end
   end
 
