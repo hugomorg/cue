@@ -580,6 +580,17 @@ defmodule CueTest do
       refute @repo.get_by(Job, name: job_2.name)
       assert @repo.get_by(Job, name: job_3.name)
     end
+
+    test "list_jobs is defined and by default is scoped to jobs defined by module" do
+      job_1 = ExampleMinimal.create_job!(name: "job1")
+      job_2 = ExampleMinimal.create_job!(name: "job2")
+      _job_3 = ExampleWithOpts.create_job!(name: "job3")
+
+      [returned_job_1, returned_job_2] = ExampleMinimal.list_jobs()
+
+      assert returned_job_1.name == job_1.name
+      assert returned_job_2.name == job_2.name
+    end
   end
 
   describe "remove_all_jobs/1" do

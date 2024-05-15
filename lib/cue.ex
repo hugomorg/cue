@@ -614,6 +614,18 @@ defmodule Cue do
       def remove_jobs do
         Cue.remove_jobs(@repo, where: [handler: __MODULE__])
       end
+
+      @doc """
+      Lists all jobs for this handler.
+      """
+      def list_jobs(opts \\ []) do
+        default_where_opts = [handler: __MODULE__]
+
+        merged_opts =
+          Keyword.update(opts, :where, default_where_opts, &Keyword.merge(&1, default_where_opts))
+
+        Cue.list_jobs(@repo, merged_opts)
+      end
     end
   end
 
