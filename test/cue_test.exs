@@ -708,11 +708,6 @@ defmodule CueTest do
       assert job_3.name == expected_job_3.name
     end
 
-    list_jobs(YourRepo,
-      where: [status: :failed, name: [ilike: "fx.%"]],
-      order_by: [desc: :failed_at, asc: :name]
-    )
-
     test "filters by pattern - ilike" do
       now = DateTime.utc_now()
       now_plus_1 = now |> DateTime.add(1)
@@ -766,6 +761,48 @@ defmodule CueTest do
       assert [job_1] = Cue.list_jobs(@repo, order_by: :name, where: [last_error: "hello"])
 
       assert job_1.name == failed_job.name
+    end
+
+    test "filters by comparison operators" do
+      now = DateTime.utc_now()
+      now_plus_1 = now |> DateTime.add(1)
+      now_plus_2 = now_plus_1 |> DateTime.add(1)
+
+      job_1 = make_job!(run_at: now, name: "job-1")
+      _job_2 = make_job!(run_at: now_plus_1, name: "job-2")
+      job_3 = make_job!(run_at: now_plus_2, name: "job-3")
+
+      assert [job] =
+               Cue.list_jobs(@repo,
+                 order_by: :name,
+                 where: [run_at: [<: now_plus_1]]
+               )
+
+      assert job.name == job_1.name
+
+      assert [job] =
+               Cue.list_jobs(@repo,
+                 order_by: :name,
+                 where: [run_at: [<=: now]]
+               )
+
+      assert job.name == job_1.name
+
+      assert [job] =
+               Cue.list_jobs(@repo,
+                 order_by: :name,
+                 where: [run_at: [>: now_plus_1]]
+               )
+
+      assert job.name == job_3.name
+
+      assert [job] =
+               Cue.list_jobs(@repo,
+                 order_by: :name,
+                 where: [run_at: [>=: now_plus_2]]
+               )
+
+      assert job.name == job_3.name
     end
   end
 

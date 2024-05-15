@@ -250,14 +250,18 @@ defmodule Cue do
   @doc """
   Returns all jobs. You can add some filtering conditions to narrow down the search and also change the order.
 
-  Let's use some examples. If you wanted to find only failed jobs, that had the name matching the wildcard `"fx.*"`, sorted by `last_failed_at` and then name, you could do:
+  Let's use some examples. If you wanted to find only failed jobs earlier than some point, that had the name matching the wildcard `"fx.*"`, sorted by `last_failed_at` and then name, you could do:
 
   ```
   list_jobs(YourRepo,
-    where: [status: :failed, name: [ilike: "fx.%"]],
+    where: [status: :failed, name: [ilike: "fx.%"], failed_at: [<: timestamp]],
     order_by: [desc: :failed_at, asc: :name]
   )
   ```
+
+  Bear in mind the query options are just a simple wrapper over Ecto and has its limitations.
+
+  You might need to drop down to Ecto queries direct to do something more custom.
   """
   @spec list_jobs(atom(), list()) :: [
           %{
@@ -326,19 +330,19 @@ defmodule Cue do
     where(query, [j], like(field(j, ^key), ^pattern))
   end
 
-  defp maybe_filter_query(query, {key, [gt: gt]}) do
+  defp maybe_filter_query(query, {key, [>: gt]}) do
     where(query, [j], field(j, ^key) > ^gt)
   end
 
-  defp maybe_filter_query(query, {key, [gte: gte]}) do
+  defp maybe_filter_query(query, {key, [>=: gte]}) do
     where(query, [j], field(j, ^key) >= ^gte)
   end
 
-  defp maybe_filter_query(query, {key, [lt: lt]}) do
+  defp maybe_filter_query(query, {key, [<: lt]}) do
     where(query, [j], field(j, ^key) < ^lt)
   end
 
-  defp maybe_filter_query(query, {key, [lte: lte]}) do
+  defp maybe_filter_query(query, {key, [<=: lte]}) do
     where(query, [j], field(j, ^key) <= ^lte)
   end
 
