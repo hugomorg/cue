@@ -622,9 +622,9 @@ defmodule Cue do
         default_opts = [repo: @repo, where: [handler: __MODULE__]]
 
         merged_opts =
-          Keyword.merge(opts, default_opts, fn
+          Keyword.merge(default_opts, opts, fn
             # Preserve handler filter
-            :where, incoming, default -> Keyword.merge(incoming, default)
+            :where, default, incoming -> Keyword.merge(incoming, default)
             k, v1, v2 -> v2
           end)
       end
