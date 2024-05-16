@@ -2,6 +2,8 @@ defmodule Cue.Job do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{}
+
   @timestamps_opts [type: :utc_datetime_usec]
   @status_values [not_started: 0, processing: 1, failed: 2, succeeded: 3, paused: 4]
 

@@ -15,4 +15,6 @@ config :cue, Cue.TestRepo,
 config :cue, Cue.TestRepo, migration_timestamps: [type: :utc_datetime_usec]
 config :cue, repo: Cue.TestRepo
 
+config :cue, :processor, Cue.Processor.Mock
 config :cue, :scheduler, Cue.Scheduler.Mock
+config :cue, :check_interval, 100

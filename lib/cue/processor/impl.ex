@@ -1,13 +1,15 @@
-defmodule Cue.Processor do
-  @moduledoc false
-
+defmodule Processor.Impl do
   require Logger
   import Ecto.Query
   alias Cue.Job
+  alias Cue.Processor
   @repo Application.compile_env(:cue, :repo)
   @max_concurrency Application.compile_env(:cue, :max_concurrency, 5)
   @timeout Application.compile_env(:cue, :timeout, 5000)
 
+  @behaviour Processor
+
+  @impl true
   def process_jobs(jobs) do
     Cue.TaskProcessor
     |> Task.Supervisor.async_stream_nolink(jobs, &handle_job/1,
