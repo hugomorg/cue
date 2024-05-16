@@ -1,5 +1,4 @@
 defmodule CueTest do
-  alias Cue.Scheduler
   use Cue.DataCase
   doctest Cue
   @repo Cue.TestRepo
@@ -706,7 +705,6 @@ defmodule CueTest do
     test "ordering can be one or many fields" do
       now = DateTime.utc_now()
       now_plus_1 = now |> DateTime.add(1)
-      now_plus_2 = now_plus_1 |> DateTime.add(1)
 
       expected_job_3 = make_job!(run_at: now, name: "2")
       expected_job_2 = make_job!(run_at: now, name: "1")
@@ -721,8 +719,6 @@ defmodule CueTest do
 
     test "filters by pattern - ilike" do
       now = DateTime.utc_now()
-      now_plus_1 = now |> DateTime.add(1)
-      now_plus_2 = now_plus_1 |> DateTime.add(1)
 
       job_1 = make_job!(run_at: now, name: "job-1")
       make_job!(run_at: now, name: "job-2")
@@ -734,8 +730,6 @@ defmodule CueTest do
 
     test "filters by pattern - like" do
       now = DateTime.utc_now()
-      now_plus_1 = now |> DateTime.add(1)
-      now_plus_2 = now_plus_1 |> DateTime.add(1)
 
       job_1 = make_job!(run_at: now, name: "JOB-1")
       make_job!(run_at: now, name: "job-2")
@@ -747,8 +741,6 @@ defmodule CueTest do
 
     test "filters by list" do
       now = DateTime.utc_now()
-      now_plus_1 = now |> DateTime.add(1)
-      now_plus_2 = now_plus_1 |> DateTime.add(1)
 
       failed_job = make_job!(run_at: now, name: "job-1", status: :failed)
       successful_job = make_job!(run_at: now, name: "job-2", status: :succeeded)
@@ -763,8 +755,6 @@ defmodule CueTest do
 
     test "filters by exact match" do
       now = DateTime.utc_now()
-      now_plus_1 = now |> DateTime.add(1)
-      now_plus_2 = now_plus_1 |> DateTime.add(1)
 
       failed_job = make_job!(run_at: now, name: "job-1", status: :failed, last_error: "hello")
       make_job!(run_at: now, name: "job-2")
@@ -816,8 +806,6 @@ defmodule CueTest do
       assert job.name == job_3.name
     end
   end
-
-  defp make_job!(opts \\ [])
 
   defp make_job!(opts) when is_list(opts) do
     opts |> Map.new() |> make_job!()
