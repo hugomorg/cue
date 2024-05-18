@@ -1,4 +1,4 @@
-defmodule Processor.Impl do
+defmodule Cue.Processor.Impl do
   require Logger
   import Ecto.Query
   alias Cue.Job
