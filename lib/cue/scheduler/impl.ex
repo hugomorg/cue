@@ -50,7 +50,7 @@ defmodule Cue.Scheduler.Impl do
   def init(args) do
     loop(:check, @check_interval)
 
-    {:ok, %{ignore_jobs: [], paused?: false}}
+    {:ok, %{ignore_jobs: [], paused?: false, run_once?: !!args[:run_once]}}
   end
 
   @impl GenServer
@@ -108,7 +108,7 @@ defmodule Cue.Scheduler.Impl do
     |> Enum.filter(&(&1.name not in state.ignore_jobs))
     |> Cue.Processor.impl().process_jobs()
 
-    {:noreply, state}
+    {:noreply, if(state.run_once?, do: %{state | paused?: true}, else: state)}
   end
 
   ## Helpers
