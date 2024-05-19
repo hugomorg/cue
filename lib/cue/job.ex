@@ -20,6 +20,7 @@ defmodule Cue.Job do
     field(:schedule, :string)
     field(:state, Cue.ElixirTerm)
     field(:status, Ecto.Enum, values: @status_values)
+    field(:lock_version, :integer, default: 1)
 
     timestamps(updated_at: false)
   end
@@ -44,6 +45,7 @@ defmodule Cue.Job do
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
     |> unique_constraint(:name)
+    |> optimistic_lock(:lock_version)
   end
 
   def next_run_at!(%__MODULE__{schedule: nil, run_at: run_at}) do

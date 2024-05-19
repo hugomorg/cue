@@ -20,12 +20,14 @@ defmodule Cue.ProcessorTest do
     %{agent: agent}
   end
 
+  # Key under the unique test name to avoid collisions
   defmodule Example do
     use Cue, schedule: "* * * * * *", max_retries: 3
 
-    def handle_job(name, state) do
-      IO.inspect(state)
-      Agent.update(:agent, &Map.put(&1, :success, {name, state}))
+    def handle_job(name, state = %{test: test}) do
+      if state[:fun], do: state[:fun].()
+
+      Agent.update(:agent, &Map.put(&1, test, {name, state}))
 
       :ok
     end
@@ -38,16 +40,41 @@ defmodule Cue.ProcessorTest do
   end
 
   describe "processes jobs" do
-    test "calls handler, sets fields on job when done" do
+    test "calls handler, sets fields on job when done", context do
       now = DateTime.utc_now()
-      job = make_job!()
+
+      state = %{test: context.test}
+      job = make_job!(state: state)
       assert process_jobs([job]) == :ok
 
       job = @repo.reload(job)
       assert job.status == :succeeded
       assert DateTime.compare(now, job.last_succeeded_at) == :lt
 
-      assert Agent.get(:agent, & &1.success) == {job.name, nil}
+      assert Agent.get(:agent, &Map.fetch!(&1, context.test)) == {job.name, state}
+    end
+
+    test "avoids race conditions", context do
+      now = DateTime.utc_now()
+
+      state = %{
+        test: context.test,
+        fun: fn ->
+          Agent.update(:agent, fn state ->
+            :timer.sleep(300)
+            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
+          end)
+        end
+      }
+
+      job = make_job!(state: state)
+      assert process_jobs([job, job, job]) == :ok
+
+      job = @repo.reload(job)
+      assert job.status == :succeeded
+      assert DateTime.compare(now, job.last_succeeded_at) == :lt
+
+      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 1
     end
   end
 

@@ -12,7 +12,17 @@ defmodule Cue.Processor.Impl do
   @impl true
   def process_jobs(jobs) do
     Cue.TaskProcessor
-    |> Task.Supervisor.async_stream_nolink(jobs, &handle_job/1,
+    |> Task.Supervisor.async_stream_nolink(
+      jobs,
+      fn job ->
+        try do
+          handle_job(job)
+        rescue
+          Ecto.StaleEntryError ->
+            Logger.warning(stale_job_message(job))
+            {:error, {:stale, job}}
+        end
+      end,
       max_concurrency: @max_concurrency,
       timeout: @timeout,
       on_timeout: :kill_task,
@@ -26,69 +36,64 @@ defmodule Cue.Processor.Impl do
   def handle_job(job) do
     Logger.debug("handling job=#{inspect(job)}")
 
-    with {:ok, %{job: job}} <-
-           Ecto.Multi.new()
-           |> Ecto.Multi.one(
-             :free_job,
-             Job
-             |> where([j], j.id == ^job.id and j.status != :processing and j.status != :paused)
-             |> lock("FOR UPDATE SKIP LOCKED")
-           )
-           |> Ecto.Multi.run(:job, fn _repo, changes -> maybe_handle_job(changes) end)
-           |> Ecto.Multi.run(:maybe_remove_job, fn _repo, changes ->
-             maybe_remove_job(changes.job)
-           end)
-           |> @repo.transaction(timeout: @timeout) do
-      {:ok, job}
+    query =
+      where(
+        Job,
+        [j],
+        j.id == ^job.id and j.status != :processing and j.status != :paused
+      )
+
+    if job = @repo.one(query) do
+      job
+      |> Ecto.Changeset.optimistic_lock(:lock_version)
+      |> @repo.update!()
+      |> maybe_handle_job()
+      |> maybe_remove_job!()
+    else
+      {:error, :job_not_available}
     end
   end
 
-  defp maybe_handle_job(%{free_job: nil}), do: {:ok, :locked}
-
-  defp maybe_handle_job(%{free_job: %Job{status: :paused}}) do
-    {:ok, :skipped}
+  defp maybe_handle_job(job = %Job{status: :paused}) do
+    job
   end
 
-  defp maybe_handle_job(%{free_job: job = %Job{retry_count: r, max_retries: m}}) when r >= m do
-    {:ok, {:skipped, job}}
+  defp maybe_handle_job(job = %Job{retry_count: r, max_retries: m})
+       when is_integer(r) and is_integer(m) and r >= m do
+    job
   end
 
-  defp maybe_handle_job(changes) do
-    previous_status = changes.free_job.status
-    job = changes.free_job |> Job.changeset(%{status: :processing}) |> @repo.update!
+  defp maybe_handle_job(job) do
+    previous_status = job.status
 
-    job =
-      case apply(job.handler, :handle_job, [job.name, job.state]) do
-        {:error, error} ->
-          failed_job = update_job_as_failed!(job, job.state, error, previous_status)
-          maybe_apply_error_handler(failed_job)
-          failed_job
+    {:ok, job} = job |> Job.changeset(%{status: :processing}) |> @repo.update
 
-        {:error, error, state} ->
-          failed_job = update_job_as_failed!(job, state, error, previous_status)
-          maybe_apply_error_handler(failed_job)
-          failed_job
+    case apply(job.handler, :handle_job, [job.name, job.state]) do
+      {:error, error} ->
+        failed_job = update_job_as_failed!(job, job.state, error, previous_status)
+        maybe_apply_error_handler(failed_job)
+        failed_job
 
-        {:ok, state} ->
-          update_job_as_success!(job, state)
+      {:error, error, state} ->
+        failed_job = update_job_as_failed!(job, state, error, previous_status)
+        maybe_apply_error_handler(failed_job)
+        failed_job
 
-        :ok ->
-          update_job_as_success!(job, job.state)
-      end
+      {:ok, state} ->
+        update_job_as_success!(job, state)
 
-    {:ok, job}
+      :ok ->
+        update_job_as_success!(job, job.state)
+    end
   end
 
-  defp maybe_remove_job(job = %Job{}) do
-    {:ok, Job.remove?(job) and !!@repo.delete!(job)}
-  end
-
-  defp maybe_remove_job(:locked) do
-    {:ok, :locked}
-  end
-
-  defp maybe_remove_job({:skipped, job}) do
-    maybe_remove_job(job)
+  defp maybe_remove_job!(job = %Job{}) do
+    if Job.remove?(job) do
+      changeset = Ecto.Changeset.optimistic_lock(job, :lock_version)
+      @repo.delete!(changeset)
+    else
+      job
+    end
   end
 
   defp update_job_as_failed!(job, state, error, previous_status) do
@@ -151,8 +156,17 @@ defmodule Cue.Processor.Impl do
     # that is, the job whose status has not been marked as `processing`
     Enum.each(failed_jobs, fn {:exit, {job, error}} ->
       Logger.warning("job=#{job.id} crashed, error=#{inspect(error)}")
-      failed_job = update_job_as_failed!(job, job.state, error, job.status)
-      maybe_apply_error_handler(failed_job)
+
+      try do
+        failed_job = update_job_as_failed!(job, job.state, error, job.status)
+        maybe_apply_error_handler(failed_job)
+      rescue
+        Ecto.StaleEntryError -> Logger.warning(stale_job_message(job))
+      end
     end)
+  end
+
+  defp stale_job_message(%Job{id: id}) do
+    "job=#{id} not updated because of a concurrent update"
   end
 end
