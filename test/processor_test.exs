@@ -199,6 +199,36 @@ defmodule Cue.ProcessorTest do
 
       assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 2
     end
+
+    test "success after errors", context do
+      now = DateTime.utc_now()
+
+      state = %{
+        error: true,
+        test: context.test
+      }
+
+      job = make_job!(state: state)
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert DateTime.compare(now, job.last_failed_at) == :lt
+      assert job.last_error =~ "foo"
+      assert job.retry_count == 0
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert job.retry_count == 1
+
+      @repo.update!(Job.changeset(job, %{state: %{state | error: false}}))
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :succeeded
+      assert DateTime.compare(now, job.last_succeeded_at) == :lt
+      assert job.retry_count == 0
+    end
   end
 
   defp make_job!(opts \\ [])
