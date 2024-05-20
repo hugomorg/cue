@@ -36,8 +36,10 @@ defmodule Cue.ProcessorTest do
       end
     end
 
-    def handle_job_error(name, error, state) do
+    def handle_job_error(name, state, error) do
       Agent.update(:agent, &Map.put(&1, :error, {name, error, state}))
+
+      if state[:error_fun], do: state[:error_fun].()
 
       :ok
     end
@@ -131,6 +133,11 @@ defmodule Cue.ProcessorTest do
           Agent.update(:agent, fn state ->
             Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
           end)
+        end,
+        error_fun: fn ->
+          Agent.update(:agent, fn state ->
+            Map.update(state, {context.test, :error_counter}, 1, &(&1 + 1))
+          end)
         end
       }
 
@@ -159,6 +166,38 @@ defmodule Cue.ProcessorTest do
       assert job.retry_count == 3
 
       assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 4
+      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :error_counter})) == 3
+    end
+
+    test "one-off jobs not retried", context do
+      now = DateTime.utc_now()
+
+      state = %{
+        error: true,
+        test: context.test,
+        fun: fn ->
+          Agent.update(:agent, fn state ->
+            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
+          end)
+        end
+      }
+
+      job = make_job!(state: state, schedule: nil, max_retries: 3)
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert DateTime.compare(now, job.last_failed_at) == :lt
+      assert job.last_error =~ "foo"
+      assert job.retry_count == 0
+
+      # This second one won't get scheduled - just to test
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert job.retry_count == 0
+
+      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 2
     end
   end
 
