@@ -45,8 +45,6 @@ defmodule Cue.Processor.Impl do
 
     if job = @repo.one(query) do
       job
-      |> Ecto.Changeset.optimistic_lock(:lock_version)
-      |> @repo.update!()
       |> maybe_handle_job()
       |> maybe_remove_job!()
     else
@@ -66,7 +64,7 @@ defmodule Cue.Processor.Impl do
   defp maybe_handle_job(job) do
     previous_status = job.status
 
-    {:ok, job} = job |> Job.changeset(%{status: :processing}) |> @repo.update
+    job = job |> Job.changeset(%{status: :processing}) |> @repo.update!
 
     case apply(job.handler, :handle_job, [job.name, job.state]) do
       {:error, error} ->
@@ -99,13 +97,12 @@ defmodule Cue.Processor.Impl do
   defp update_job_as_failed!(job, state, error, previous_status) do
     now = DateTime.utc_now()
 
-    previous_job_failed? = previous_status == :failed
-
     {status, retry_count} =
-      if not previous_job_failed? or Job.one_off?(job) do
-        {:failed, 0}
-      else
-        {:failed, job.retry_count + 1}
+      cond do
+        Job.one_off?(job) -> {:failed, 0}
+        previous_status != :failed -> {:failed, 0}
+        job.retry_count + 1 == job.max_retries -> {:paused, job.retry_count + 1}
+        :else -> {:failed, job.retry_count + 1}
       end
 
     last_error =
@@ -151,6 +148,7 @@ defmodule Cue.Processor.Impl do
     ])
   end
 
+  # TODO: catch other errors
   defp handle_crashed_jobs(failed_jobs) do
     # `job` in error callback will be job passed into stream function
     # that is, the job whose status has not been marked as `processing`
@@ -158,7 +156,8 @@ defmodule Cue.Processor.Impl do
       Logger.warning("job=#{job.id} crashed, error=#{inspect(error)}")
 
       try do
-        failed_job = update_job_as_failed!(job, job.state, error, job.status)
+        refreshed_job = @repo.reload(job)
+        failed_job = update_job_as_failed!(refreshed_job, job.state, error, job.status)
         maybe_apply_error_handler(failed_job)
       rescue
         Ecto.StaleEntryError -> Logger.warning(stale_job_message(job))

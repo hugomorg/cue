@@ -29,7 +29,11 @@ defmodule Cue.ProcessorTest do
 
       Agent.update(:agent, &Map.put(&1, test, {name, state}))
 
-      :ok
+      if state[:error] do
+        {:error, "foo"}
+      else
+        :ok
+      end
     end
 
     def handle_job_error(name, error, state) do
@@ -61,7 +65,6 @@ defmodule Cue.ProcessorTest do
         test: context.test,
         fun: fn ->
           Agent.update(:agent, fn state ->
-            :timer.sleep(300)
             Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
           end)
         end
@@ -75,6 +78,87 @@ defmodule Cue.ProcessorTest do
       assert DateTime.compare(now, job.last_succeeded_at) == :lt
 
       assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 1
+    end
+
+    test "if max retries set stop after that many failures - crashes", context do
+      now = DateTime.utc_now()
+
+      state = %{
+        test: context.test,
+        fun: fn ->
+          Agent.update(:agent, fn state ->
+            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
+          end)
+
+          raise "foo"
+        end
+      }
+
+      job = make_job!(state: state, max_retries: 3)
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert DateTime.compare(now, job.last_failed_at) == :lt
+      assert job.last_error =~ "foo"
+      assert job.retry_count == 0
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert job.retry_count == 1
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert job.retry_count == 2
+
+      # Shouldn't run on 4th time
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :paused
+      assert job.retry_count == 3
+
+      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 4
+    end
+
+    test "if max retries set stop after that many failures - errors", context do
+      now = DateTime.utc_now()
+
+      state = %{
+        error: true,
+        test: context.test,
+        fun: fn ->
+          Agent.update(:agent, fn state ->
+            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
+          end)
+        end
+      }
+
+      job = make_job!(state: state, max_retries: 3)
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert DateTime.compare(now, job.last_failed_at) == :lt
+      assert job.last_error =~ "foo"
+      assert job.retry_count == 0
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert job.retry_count == 1
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :failed
+      assert job.retry_count == 2
+
+      # Shouldn't run on 4th time
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.status == :paused
+      assert job.retry_count == 3
+
+      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 4
     end
   end
 
