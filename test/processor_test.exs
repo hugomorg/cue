@@ -27,8 +27,6 @@ defmodule Cue.ProcessorTest do
     def handle_job(name, state = %{test: test}) do
       if state[:fun], do: state[:fun].()
 
-      Agent.update(:agent, &Map.put(&1, test, {name, state}))
-
       if state[:error] do
         {:error, "foo"}
       else
@@ -37,8 +35,6 @@ defmodule Cue.ProcessorTest do
     end
 
     def handle_job_error(name, state, error) do
-      Agent.update(:agent, &Map.put(&1, :error, {name, error, state}))
-
       if state[:error_fun], do: state[:error_fun].()
 
       :ok
@@ -49,7 +45,11 @@ defmodule Cue.ProcessorTest do
     test "calls handler, sets fields on job when done", context do
       now = DateTime.utc_now()
 
-      state = %{test: context.test}
+      state = %{
+        test: context.test,
+        fun: make_counter({context.test, :count})
+      }
+
       job = make_job!(state: state)
       assert process_jobs([job]) == :ok
 
@@ -57,7 +57,7 @@ defmodule Cue.ProcessorTest do
       assert job.status == :succeeded
       assert DateTime.compare(now, job.last_succeeded_at) == :lt
 
-      assert Agent.get(:agent, &Map.fetch!(&1, context.test)) == {job.name, state}
+      assert get_count({context.test, :count}) == 1
     end
 
     test "avoids race conditions", context do
@@ -65,11 +65,7 @@ defmodule Cue.ProcessorTest do
 
       state = %{
         test: context.test,
-        fun: fn ->
-          Agent.update(:agent, fn state ->
-            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
-          end)
-        end
+        fun: make_counter({context.test, :count})
       }
 
       job = make_job!(state: state)
@@ -79,19 +75,18 @@ defmodule Cue.ProcessorTest do
       assert job.status == :succeeded
       assert DateTime.compare(now, job.last_succeeded_at) == :lt
 
-      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 1
+      assert get_count({context.test, :count}) == 1
     end
 
     test "if max retries set stop after that many failures - crashes", context do
       now = DateTime.utc_now()
 
+      counter = make_counter({context.test, :count})
+
       state = %{
         test: context.test,
         fun: fn ->
-          Agent.update(:agent, fn state ->
-            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
-          end)
-
+          counter.()
           raise "foo"
         end
       }
@@ -120,7 +115,7 @@ defmodule Cue.ProcessorTest do
       assert job.status == :paused
       assert job.retry_count == 3
 
-      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 4
+      get_count({context.test, :count}) == 4
     end
 
     test "if max retries set stop after that many failures - errors", context do
@@ -129,16 +124,8 @@ defmodule Cue.ProcessorTest do
       state = %{
         error: true,
         test: context.test,
-        fun: fn ->
-          Agent.update(:agent, fn state ->
-            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
-          end)
-        end,
-        error_fun: fn ->
-          Agent.update(:agent, fn state ->
-            Map.update(state, {context.test, :error_counter}, 1, &(&1 + 1))
-          end)
-        end
+        fun: make_counter({context.test, :count}),
+        error_fun: make_counter({context.test, :error_count})
       }
 
       job = make_job!(state: state, max_retries: 3)
@@ -165,8 +152,8 @@ defmodule Cue.ProcessorTest do
       assert job.status == :paused
       assert job.retry_count == 3
 
-      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 4
-      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :error_counter})) == 3
+      assert get_count({context.test, :count}) == 4
+      assert get_count({context.test, :error_count}) == 3
     end
 
     test "one-off jobs not retried", context do
@@ -175,11 +162,7 @@ defmodule Cue.ProcessorTest do
       state = %{
         error: true,
         test: context.test,
-        fun: fn ->
-          Agent.update(:agent, fn state ->
-            Map.update(state, {context.test, :counter}, 1, &(&1 + 1))
-          end)
-        end
+        fun: make_counter({context.test, :count})
       }
 
       job = make_job!(state: state, schedule: nil, max_retries: 3)
@@ -197,7 +180,7 @@ defmodule Cue.ProcessorTest do
       assert job.status == :failed
       assert job.retry_count == 0
 
-      assert Agent.get(:agent, &Map.fetch!(&1, {context.test, :counter})) == 2
+      assert get_count({context.test, :count}) == 2
     end
 
     test "success after errors", context do
@@ -257,4 +240,16 @@ defmodule Cue.ProcessorTest do
   end
 
   defp unique_id, do: System.unique_integer([:positive, :monotonic])
+
+  defp make_counter(key) do
+    fn ->
+      Agent.update(:agent, fn agent_state ->
+        Map.update(agent_state, key, 1, &(&1 + 1))
+      end)
+    end
+  end
+
+  defp get_count(key) do
+    Agent.get(:agent, &Map.get(&1, key))
+  end
 end
