@@ -27,10 +27,18 @@ defmodule Cue.ProcessorTest do
     def handle_job(name, state = %{test: test}) do
       if state[:fun], do: state[:fun].()
 
-      if state[:error] do
-        {:error, "foo"}
-      else
-        :ok
+      cond do
+        state[:next_state] ->
+          {:ok, {:state, state[:next_state].(state)}}
+
+        state[:next_state_error] ->
+          {:error, "foo", {:state, state[:next_state_error].(state)}}
+
+        state[:error] ->
+          {:error, "foo"}
+
+        :else ->
+          :ok
       end
     end
 
@@ -211,6 +219,34 @@ defmodule Cue.ProcessorTest do
       assert job.status == :succeeded
       assert DateTime.compare(now, job.last_succeeded_at) == :lt
       assert job.retry_count == 0
+    end
+
+    test "can pass on state", context do
+      now = DateTime.utc_now()
+
+      state = %{
+        counter: 1,
+        next_state: fn state -> %{state | counter: state.counter + 1} end,
+        test: context.test
+      }
+
+      job = make_job!(state: state)
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.state.counter == 2
+
+      state = %{
+        counter: 1,
+        next_state_error: fn state -> %{state | counter: state.counter + 1} end,
+        test: context.test
+      }
+
+      job = make_job!(state: state)
+
+      assert process_jobs([job]) == :ok
+      job = @repo.reload(job)
+      assert job.state.counter == 2
     end
   end
 

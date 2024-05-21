@@ -72,15 +72,15 @@ defmodule Cue.Processor.Impl do
         maybe_apply_error_handler(failed_job)
         failed_job
 
-      {:error, error, state} ->
+      {:error, error, {:state, state}} ->
         failed_job = update_job_as_failed!(job, state, error, previous_status)
         maybe_apply_error_handler(failed_job)
         failed_job
 
-      {:ok, state} ->
+      {:ok, {:state, state}} ->
         update_job_as_success!(job, state)
 
-      :ok ->
+      _ ->
         update_job_as_success!(job, job.state)
     end
   end
