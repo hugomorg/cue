@@ -110,11 +110,21 @@ Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1`/`create_job/1`
 
 If you want the job to be cleaned up regardless of status, set `autoremove` to `true`, either in `create_job!/1`/`create_job/1` or at the module level. This does not apply to scheduled jobs.
 
+## Deleting jobs
+
+Jobs are not automatically deleted. To delete all jobs scoped to `YourModule`, simply call `YourModule.remove_jobs()`. For more advanced filtering see `Cue.remove_jobs/1`.
+
+## How can I see all the jobs?
+
+To see jobs scoped to a module, call `YourModule.jobs()`. For more global searches, see `Cue.list_jobs/1`.
+
 ## Keeping context / state
 
 OK, next problem. You are fetching the weather every minute, and you want to keep the last prediction to detect a change.
 
-In other words, you want to keep "context" or "state". Doing this with `cue` is simple. Just return `{:ok, state}` from the job handler. The handler will receive the latest state on the next run.
+In other words, you want to keep "context" or "state". Doing this with `cue` is simple. Just return `{:ok, {:state, next_state}}` from the job handler, where `next_state` is the entire state you want the job to have. The handler will receive the latest state on the next run.
+
+Apart from returning error tuples, anything else returned from the job handler will not be treated in a special way.
 
 If you want to avoid a `nil` state on the first `handle_job/2` call or have some expensive setup, just define a callback `init/1` in your module. This will get called with the `name` of the job. It gets run once, when the job is created, and is used to initialise the state for that particular job.
 
@@ -152,11 +162,11 @@ In the context of `cue` there are two types of errors: crashes and errors return
 
 If there is a crash, it will get caught, and your error handler `handle_job_error/3` will be invoked. The job is marked as failed. If you return an `{error, reason}` tuple from `handle_job/2`, exactly the same thing will happen.
 
-The 3rd argument of `handle_job_error/3` is a map containing `error` (the error reason), `retry_count` and `max_retries`. By default `max_retries` is `nil`, meaning the job will retry infinitely. By retry, we mean that it will get re-run at the next scheduled time.
+The 3rd argument of `handle_job_error/3` is a map containing `error` (the error reason), `retry_count` and `max_retries`. By default `max_retries` is `nil`, meaning the job will retry infinitely. By retry, we mean that it will get re-run at the next scheduled time. One-off jobs will not get re-run.
 
 You can define `max_retries` at the module level, and also override it in `create_job!/1`/`create_job/1`. If the `max_retries` is exceeded then the job is paused.
 
-If you want to update state after you return an error, you can do so by returning `{:error, error, state}`.
+If you want to update state after you return an error, you can do so by returning `{:error, error, {:state, next_state}}`.
 
 ```elixir
 defmodule YourApp do
