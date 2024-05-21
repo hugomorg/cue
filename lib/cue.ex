@@ -34,9 +34,9 @@ defmodule Cue do
 
   The job will not start running until this happens.
 
-  To remove all jobs created by the module, just call `YourApp.remove_jobs()`.
+  To remove all jobs created by the module, just call `YourApp.remove_jobs/1`.
 
-  If you need more fine-grained control with removal, check out `Cue.remove_jobs_by/3`.
+  If you need more fine-grained control with removal, check out `Cue.remove_jobs/1`.
   """
 
   @type name :: String.t()
@@ -221,11 +221,11 @@ defmodule Cue do
   For example, let's say you are namespacing your jobs, and a name pattern you have is: `"currency.europe.*"`. The `"*"` could be GBP, EUR etc.
   And you might also have `"currency.americas.*"`.
 
-  If you wanted to clear out the European currency jobs you can simply call `Cue.remove_jobs(YourRepo, where: [name: [ilike: "currency.europe%"]])`.
+  If you wanted to clear out the European currency jobs you can simply call `Cue.remove_jobs(where: [name: [ilike: "currency.europe%"]])`.
 
   You can use the same matching patterns as `"LIKE"`/`"ILIKE"` database functions. If you want to be stricter with case, swap out `:ilike` for `:like`.
 
-  Another thing you want to do is remove jobs by the given handler. For that you can use `Cue.remove_jobs(YourRepo, where: [handler: SomeHandler])`. Or more simply, `SomeHandler.remove_jobs()`.
+  Another thing you want to do is remove jobs by the given handler. For that you can use `Cue.remove_jobs(where: [handler: SomeHandler])`. Or more simply, `SomeHandler.remove_jobs()`.
 
   For more information about filtering, see `list_jobs/2` below.
   """
@@ -259,7 +259,7 @@ defmodule Cue do
   Let's use some examples. If you wanted to find only failed jobs earlier than some point, that had the name matching the wildcard `"fx.*"`, sorted by `last_failed_at` and then name, you could do:
 
   ```
-  list_jobs(YourRepo,
+  list_jobs(
     where: [status: :failed, name: [ilike: "fx.%"], failed_at: [<: timestamp]],
     order_by: [desc: :failed_at, asc: :name]
   )
