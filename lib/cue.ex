@@ -60,7 +60,6 @@ defmodule Cue do
     :repo,
     :name,
     :schedule,
-    :autoremove,
     max_retries: nil,
     state: nil
   ]
@@ -107,9 +106,6 @@ defmodule Cue do
   - `name`: must be a string, and unique across all jobs. Defaults to the module name.
 
   - `state`: any Elixir term passed to the handler. This is useful if you want to track something across runs.
-
-  - `autoremove`: should be a boolean. Controls whether one-off jobs are deleted after running (whether successful or not).
-  Defaults to `false`.
 
   - `max_retries`: how many times the job should be retried in the event of a failure.
   The retry count gets reset after a successful run.
@@ -271,7 +267,6 @@ defmodule Cue do
   """
   @spec list_jobs(list()) :: [
           %{
-            autoremove: boolean(),
             handler: atom(),
             last_error: nil | String.t(),
             last_failed_at: DateTime.t(),
@@ -294,7 +289,6 @@ defmodule Cue do
     |> order_by(^order_by)
     |> maybe_filter_query(where)
     |> select([j], %{
-      autoremove: j.autoremove,
       handler: j.handler,
       last_error: j.last_error,
       last_failed_at: j.last_failed_at,
@@ -378,7 +372,6 @@ defmodule Cue do
          schedule: schedule,
          status: :not_started,
          max_retries: validated_opts[:max_retries],
-         autoremove: validated_opts[:autoremove] || false,
          state: state
        }), validated_opts}
     end
@@ -407,8 +400,7 @@ defmodule Cue do
         schedule: schedule,
         status: :not_started,
         max_retries: validated_opts[:max_retries],
-        state: state,
-        autoremove: validated_opts[:autoremove] || false
+        state: state
       })
 
     {job, validated_opts}
@@ -515,7 +507,6 @@ defmodule Cue do
   defmacro __using__(opts) do
     name = Keyword.get(opts, :name)
     schedule = Keyword.get(opts, :schedule)
-    autoremove = Keyword.get(opts, :autoremove, false)
     max_retries = Keyword.get(opts, :max_retries)
 
     quote do
@@ -537,7 +528,7 @@ defmodule Cue do
 
       Then you could override the schedule on a per-job basis with `YourApp.create_job!(name: "some name", schedule: DateTime.utc_now())`.
 
-      The options that can be specified at the "module" level are `name`, `schedule`, `autoremove` and `max_retries`.
+      The options that can be specified at the "module" level are `name`, `schedule` and `max_retries`.
 
       The repo used is the one defined in the config.
 
@@ -549,7 +540,6 @@ defmodule Cue do
           name: @cue_name,
           schedule: unquote(schedule),
           repo: @repo,
-          autoremove: unquote(autoremove),
           max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
@@ -565,7 +555,6 @@ defmodule Cue do
           name: @cue_name,
           schedule: unquote(schedule),
           repo: @repo,
-          autoremove: unquote(autoremove),
           max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
@@ -581,7 +570,6 @@ defmodule Cue do
           name: @cue_name,
           schedule: unquote(schedule),
           repo: @repo,
-          autoremove: unquote(autoremove),
           max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)
@@ -597,7 +585,6 @@ defmodule Cue do
           name: @cue_name,
           schedule: unquote(schedule),
           repo: @repo,
-          autoremove: unquote(autoremove),
           max_retries: unquote(max_retries)
         ]
         |> Keyword.merge(opts)

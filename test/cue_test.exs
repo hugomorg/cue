@@ -42,7 +42,6 @@ defmodule CueTest do
     use Cue,
       name: "Hard worker",
       schedule: "*/2 * * * *",
-      autoremove: true,
       max_retries: 100
 
     def handle_job(_, _), do: :ok
@@ -100,7 +99,6 @@ defmodule CueTest do
       assert inserted_job.run_at == job.run_at
       assert inserted_job.status == :not_started
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -117,13 +115,11 @@ defmodule CueTest do
                  repo: @repo,
                  name: "job",
                  max_retries: 5,
-                 autoremove: true,
                  state: %{key: :value}
                )
 
       inserted_job = @repo.one!(Job)
 
-      assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.schedule == "*/1 * * * *"
       assert inserted_job.state == %{key: :value}
@@ -205,7 +201,6 @@ defmodule CueTest do
       assert inserted_job.run_at == job.run_at
       assert inserted_job.status == :not_started
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -222,13 +217,11 @@ defmodule CueTest do
                  repo: @repo,
                  name: "job",
                  max_retries: 5,
-                 autoremove: true,
                  state: %{key: :value}
                )
 
       inserted_job = @repo.one!(Job)
 
-      assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.schedule == "*/1 * * * *"
       assert inserted_job.state == %{key: :value}
@@ -312,7 +305,6 @@ defmodule CueTest do
       assert inserted_job.run_at == job.run_at
       assert inserted_job.status == :not_started
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -328,13 +320,11 @@ defmodule CueTest do
         repo: @repo,
         name: "job",
         max_retries: 5,
-        autoremove: true,
         state: %{key: :value}
       )
 
       inserted_job = @repo.one!(Job)
 
-      assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.schedule == "*/1 * * * *"
       assert inserted_job.state == %{key: :value}
@@ -424,7 +414,6 @@ defmodule CueTest do
       assert inserted_job.run_at == job.run_at
       assert inserted_job.status == :not_started
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -440,13 +429,11 @@ defmodule CueTest do
         repo: @repo,
         name: "job",
         max_retries: 5,
-        autoremove: true,
         state: %{key: :value}
       )
 
       inserted_job = @repo.one!(Job)
 
-      assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.schedule == "*/1 * * * *"
       assert inserted_job.state == %{key: :value}
@@ -484,7 +471,6 @@ defmodule CueTest do
       assert inserted_job.status == :not_started
       assert inserted_job.schedule == "*/2 * * * *"
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -501,7 +487,6 @@ defmodule CueTest do
       assert job.name == inserted_job.name
       assert inserted_job.schedule == "*/2 * * * *"
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -518,7 +503,6 @@ defmodule CueTest do
       assert job.name == inserted_job.name
       assert inserted_job.schedule == "*/2 * * * *"
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -535,7 +519,6 @@ defmodule CueTest do
       assert job.name == inserted_job.name
       assert inserted_job.schedule == "*/2 * * * *"
 
-      refute inserted_job.autoremove
       refute inserted_job.last_error
       refute inserted_job.last_failed_at
       refute inserted_job.last_succeeded_at
@@ -551,7 +534,6 @@ defmodule CueTest do
           repo: @repo,
           name: "job",
           max_retries: 5,
-          autoremove: true,
           state: %{key: :value}
         )
 
@@ -560,7 +542,6 @@ defmodule CueTest do
       assert job.name == "job"
       assert job.name == inserted_job.name
       assert inserted_job.schedule == "*/1 * * * *"
-      assert inserted_job.autoremove
       assert inserted_job.max_retries == 5
       assert inserted_job.state == %{key: :value}
     end

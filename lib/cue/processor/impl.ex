@@ -44,9 +44,7 @@ defmodule Cue.Processor.Impl do
       )
 
     if job = @repo.one(query) do
-      job
-      |> maybe_handle_job()
-      |> maybe_remove_job!()
+      maybe_handle_job(job)
     else
       {:error, :job_not_available}
     end
@@ -82,15 +80,6 @@ defmodule Cue.Processor.Impl do
 
       _ ->
         update_job_as_success!(job, job.state)
-    end
-  end
-
-  defp maybe_remove_job!(job = %Job{}) do
-    if Job.remove?(job) do
-      changeset = Ecto.Changeset.optimistic_lock(job, :lock_version)
-      @repo.delete!(changeset)
-    else
-      job
     end
   end
 

@@ -8,7 +8,6 @@ defmodule Cue.Job do
   @status_values [not_started: 0, processing: 1, failed: 2, succeeded: 3, paused: 4]
 
   schema "cue_jobs" do
-    field(:autoremove, :boolean, default: false)
     field(:handler, Cue.ElixirTerm)
     field(:last_error, :string)
     field(:last_failed_at, :utc_datetime_usec)
@@ -28,7 +27,6 @@ defmodule Cue.Job do
   def changeset(job, params) do
     job
     |> cast(params, [
-      :autoremove,
       :handler,
       :last_error,
       :last_failed_at,
@@ -41,7 +39,7 @@ defmodule Cue.Job do
       :state,
       :status
     ])
-    |> validate_required([:status, :run_at, :name, :handler, :autoremove])
+    |> validate_required([:status, :run_at, :name, :handler])
     |> validate_number(:max_retries, greater_than_or_equal_to: 0)
     |> validate_number(:retry_count, greater_than_or_equal_to: 0)
     |> unique_constraint(:name)
@@ -81,9 +79,5 @@ defmodule Cue.Job do
 
   def retries_exceeded?(%__MODULE__{max_retries: max_retries, retry_count: retry_count}) do
     retry_count >= max_retries
-  end
-
-  def remove?(job = %__MODULE__{}) do
-    one_off?(job) and job.autoremove
   end
 end

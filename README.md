@@ -108,8 +108,6 @@ Ok, so now we know how to schedule jobs. But what about one-off jobs? If the wea
 
 Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1`/`create_job/1`. If you want the job to run immediately you can do something like `create_job!(schedule: DateTime.utc_now())` (don't worry if it is slightly in the past, it will still run immediately).
 
-If you want the job to be cleaned up regardless of status, set `autoremove` to `true`, either in `create_job!/1`/`create_job/1` or at the module level. This does not apply to scheduled jobs.
-
 ## Deleting jobs
 
 Jobs are not automatically deleted. To delete all jobs scoped to `YourModule`, simply call `YourModule.remove_jobs()`. For more advanced filtering see `Cue.remove_jobs/1`.
