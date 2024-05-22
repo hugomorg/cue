@@ -8,21 +8,29 @@ defmodule CueTest do
 
   setup :verify_on_exit!
 
-  defmodule NoCallbacks do
-    use Cue
+  defp create_mod(name, contents) do
+    {_, mod, _, _} = Module.create(name, contents, __ENV__)
+
+    IO.inspect(mod)
+
+    mod
   end
 
-  defmodule NoHandleJobCallback do
-    use Cue
+  @no_callbacks (quote do
+                   use Cue
+                 end)
 
-    def handle_job_error(_, _, _), do: :ok
-  end
+  @no_handle_job_callback (quote do
+                             use Cue
 
-  defmodule NoHandleJobErrorCallback do
-    use Cue
+                             def handle_job_error(_, _, _), do: :ok
+                           end)
 
-    def handle_job(_, _), do: :ok
-  end
+  @no_handle_job_error_callback (quote do
+                                   use Cue
+
+                                   def handle_job(_, _), do: :ok
+                                 end)
 
   defmodule Example do
     use Cue
@@ -55,13 +63,22 @@ defmodule CueTest do
       assert {:error, {:invalid_handler, _msg}} = Cue.create_job(schedule: DateTime.utc_now())
 
       assert {:error, {:invalid_handler, _msg}} =
-               Cue.create_job(schedule: DateTime.utc_now(), handler: NoCallbacks)
+               Cue.create_job(
+                 schedule: DateTime.utc_now(),
+                 handler: create_mod(NoCallbacks, @no_callbacks)
+               )
 
       assert {:error, {:invalid_handler, _msg}} =
-               Cue.create_job(schedule: DateTime.utc_now(), handler: NoHandleJobCallback)
+               Cue.create_job(
+                 schedule: DateTime.utc_now(),
+                 handler: create_mod(NoHandleJobCallback, @no_handle_job_callback)
+               )
 
       assert {:error, {:invalid_handler, _msg}} =
-               Cue.create_job(schedule: DateTime.utc_now(), handler: NoHandleJobErrorCallback)
+               Cue.create_job(
+                 schedule: DateTime.utc_now(),
+                 handler: create_mod(NoHandleJobErrorCallback, @no_handle_job_error_callback)
+               )
 
       assert {:error, :no_repo} = Cue.create_job(schedule: DateTime.utc_now(), handler: Example)
 
@@ -146,18 +163,21 @@ defmodule CueTest do
                Cue.create_job_unless_exists(schedule: DateTime.utc_now())
 
       assert {:error, {:invalid_handler, _msg}} =
-               Cue.create_job_unless_exists(schedule: DateTime.utc_now(), handler: NoCallbacks)
-
-      assert {:error, {:invalid_handler, _msg}} =
                Cue.create_job_unless_exists(
                  schedule: DateTime.utc_now(),
-                 handler: NoHandleJobCallback
+                 handler: create_mod(NoCallbacks, @no_callbacks)
                )
 
       assert {:error, {:invalid_handler, _msg}} =
                Cue.create_job_unless_exists(
                  schedule: DateTime.utc_now(),
-                 handler: NoHandleJobErrorCallback
+                 handler: create_mod(NoHandleJobCallback, @no_handle_job_callback)
+               )
+
+      assert {:error, {:invalid_handler, _msg}} =
+               Cue.create_job_unless_exists(
+                 schedule: DateTime.utc_now(),
+                 handler: create_mod(NoHandleJobErrorCallback, @no_handle_job_error_callback)
                )
 
       assert {:error, :no_repo} =
@@ -251,15 +271,24 @@ defmodule CueTest do
       end
 
       assert_raise Cue.Error, fn ->
-        Cue.create_job!(schedule: DateTime.utc_now(), handler: NoCallbacks)
+        Cue.create_job!(
+          schedule: DateTime.utc_now(),
+          handler: create_mod(NoCallbacks, @no_callbacks)
+        )
       end
 
       assert_raise Cue.Error, fn ->
-        Cue.create_job!(schedule: DateTime.utc_now(), handler: NoHandleJobCallback)
+        Cue.create_job!(
+          schedule: DateTime.utc_now(),
+          handler: create_mod(NoHandleJobCallback, @no_handle_job_callback)
+        )
       end
 
       assert_raise Cue.Error, fn ->
-        Cue.create_job!(schedule: DateTime.utc_now(), handler: NoHandleJobErrorCallback)
+        Cue.create_job!(
+          schedule: DateTime.utc_now(),
+          handler: create_mod(NoHandleJobErrorCallback, @no_handle_job_error_callback)
+        )
       end
 
       assert_raise Cue.Error, fn ->
@@ -357,17 +386,23 @@ defmodule CueTest do
       end
 
       assert_raise Cue.Error, fn ->
-        Cue.create_job_unless_exists!(schedule: DateTime.utc_now(), handler: NoCallbacks)
-      end
-
-      assert_raise Cue.Error, fn ->
-        Cue.create_job_unless_exists!(schedule: DateTime.utc_now(), handler: NoHandleJobCallback)
+        Cue.create_job_unless_exists!(
+          schedule: DateTime.utc_now(),
+          handler: create_mod(NoCallbacks, @no_callbacks)
+        )
       end
 
       assert_raise Cue.Error, fn ->
         Cue.create_job_unless_exists!(
           schedule: DateTime.utc_now(),
-          handler: NoHandleJobErrorCallback
+          handler: create_mod(NoHandleJobCallback, @no_handle_job_callback)
+        )
+      end
+
+      assert_raise Cue.Error, fn ->
+        Cue.create_job_unless_exists!(
+          schedule: DateTime.utc_now(),
+          handler: create_mod(NoHandleJobErrorCallback, @no_handle_job_error_callback)
         )
       end
 

@@ -1,5 +1,4 @@
 defmodule Cue.SchedulerTest do
-  alias Cue.Scheduler
   use Cue.DataCase
   doctest Cue
   @repo Cue.TestRepo
@@ -26,10 +25,10 @@ defmodule Cue.SchedulerTest do
       now_plus_one = DateTime.add(now, 1, :millisecond)
       one_off_job = make_job!(handler: Example, run_at: now, status: :not_started, schedule: nil)
 
-      one_off_job_failed =
+      _one_off_job_failed =
         make_job!(handler: Example, run_at: now, status: :failed, schedule: nil)
 
-      too_many_retries =
+      _too_many_retries =
         make_job!(handler: Example, run_at: now, max_retries: 3, retry_count: 4, status: :failed)
 
       no_max_retries =

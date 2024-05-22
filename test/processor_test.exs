@@ -24,7 +24,7 @@ defmodule Cue.ProcessorTest do
   defmodule Example do
     use Cue, schedule: "* * * * * *", max_retries: 3
 
-    def handle_job(name, state = %{test: test}) do
+    def handle_job(_name, state = %{test: _test}) do
       if state[:fun], do: state[:fun].()
 
       cond do
@@ -42,7 +42,7 @@ defmodule Cue.ProcessorTest do
       end
     end
 
-    def handle_job_error(name, state, error) do
+    def handle_job_error(_name, state, _error) do
       if state[:error_fun], do: state[:error_fun].()
 
       :ok
@@ -123,7 +123,7 @@ defmodule Cue.ProcessorTest do
       assert job.status == :paused
       assert job.retry_count == 3
 
-      get_count({context.test, :count}) == 4
+      assert get_count({context.test, :count}) == 4
     end
 
     test "if max retries set stop after that many failures - errors", context do
@@ -222,8 +222,6 @@ defmodule Cue.ProcessorTest do
     end
 
     test "can pass on state", context do
-      now = DateTime.utc_now()
-
       state = %{
         counter: 1,
         next_state: fn state -> %{state | counter: state.counter + 1} end,
@@ -249,8 +247,6 @@ defmodule Cue.ProcessorTest do
       assert job.state.counter == 2
     end
   end
-
-  defp make_job!(opts \\ [])
 
   defp make_job!(opts) when is_list(opts) do
     opts |> Map.new() |> make_job!()
