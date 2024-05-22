@@ -8,6 +8,7 @@ defmodule Cue.DataCase do
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
+      import Cue.DataCase
 
       alias Cue.TestRepo
       alias Cue.Schemas.Person
@@ -29,5 +30,12 @@ defmodule Cue.DataCase do
     on_exit(fn ->
       Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
     end)
+  end
+
+  def agent(context) do
+    agent =
+      start_supervised!({Agent, fn -> Agent.start_link(fn -> %{} end, name: context.test) end})
+
+    %{agent: agent}
   end
 end
