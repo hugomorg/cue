@@ -55,6 +55,22 @@ defmodule CueTest do
     def handle_job_error(_, _, _), do: :ok
   end
 
+  defmodule Init do
+    use Cue, schedule: "* * * * * *", max_retries: 3
+
+    def init(_name) do
+      {:ok, %{counter: 1}}
+    end
+
+    def handle_job(_name, _state) do
+      :ok
+    end
+
+    def handle_job_error(_name, _state, _error) do
+      :ok
+    end
+  end
+
   describe "create_job/1" do
     test "validates" do
       assert {:error, {:invalid_schedule, _msg}} = Cue.create_job([])
@@ -603,6 +619,12 @@ defmodule CueTest do
       [returned_job] = ExampleMinimal.list_jobs(where: [name: [like: "%2%"]])
 
       assert returned_job.name == job_2a.name
+    end
+
+    test "init", _context do
+      _job = Init.create_job!(name: "1")
+      [returned_job] = Init.list_jobs()
+      assert returned_job.state.counter == 1
     end
   end
 
