@@ -1,4 +1,8 @@
 defmodule Cue.Scheduler.Impl do
+  @moduledoc """
+  Responsible for running the jobs roughly on their schedule. 
+  """
+
   use GenServer
   require Logger
   import Ecto.Query

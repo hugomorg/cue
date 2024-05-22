@@ -11,8 +11,6 @@ defmodule CueTest do
   defp create_mod(name, contents) do
     {_, mod, _, _} = Module.create(name, contents, __ENV__)
 
-    IO.inspect(mod)
-
     mod
   end
 

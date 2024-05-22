@@ -1,4 +1,8 @@
 defmodule Cue.Processor.Impl do
+  @moduledoc """
+  Responsible for handling the scheduled jobs.
+  """
+
   require Logger
   import Ecto.Query
   alias Cue.Job
@@ -137,7 +141,6 @@ defmodule Cue.Processor.Impl do
     ])
   end
 
-  # TODO: catch other errors
   defp handle_crashed_jobs(failed_jobs) do
     # `job` in error callback will be job passed into stream function
     # that is, the job whose status has not been marked as `processing`

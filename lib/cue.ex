@@ -463,7 +463,7 @@ defmodule Cue do
     {schedule, Job.next_run_at!(schedule)}
   end
 
-  defp validate_schedule!(%DateTime{} = schedule) do
+  defp validate_schedule!(schedule = %DateTime{}) do
     {nil, schedule}
   end
 
@@ -484,7 +484,7 @@ defmodule Cue do
     end
   end
 
-  defp validate_schedule(%DateTime{} = schedule) do
+  defp validate_schedule(schedule = %DateTime{}) do
     {:ok, {nil, schedule}}
   end
 

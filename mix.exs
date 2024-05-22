@@ -27,7 +27,8 @@ defmodule Cue.MixProject do
       {:jason, "~> 1.4"},
       {:cron, "~> 0.1"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:hammox, "~> 0.7", only: :test}
+      {:hammox, "~> 0.7", only: :test},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 

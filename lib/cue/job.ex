@@ -1,4 +1,8 @@
 defmodule Cue.Job do
+  @moduledoc """
+  Represents a job to be scheduled.
+  """
+
   use Ecto.Schema
   import Ecto.Changeset
 

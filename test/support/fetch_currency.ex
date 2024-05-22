@@ -1,4 +1,6 @@
 defmodule Cue.FetchCurrency do
+  @moduledoc false
+
   use Cue, schedule: "* * * * * *"
 
   require Logger
