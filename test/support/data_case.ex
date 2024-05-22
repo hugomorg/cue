@@ -33,9 +33,8 @@ defmodule Cue.DataCase do
   end
 
   def agent(context) do
-    agent =
-      start_supervised!({Agent, fn -> Agent.start_link(fn -> %{} end, name: context.test) end})
+    start_supervised!({Agent, fn -> Agent.start_link(fn -> %{} end, name: context.test) end})
 
-    %{agent: agent}
+    %{agent: context.test}
   end
 end

@@ -239,6 +239,12 @@ defmodule Cue do
 
     Cue.Scheduler.impl().add_jobs_to_ignored(job_names)
 
+    callback = opts[:callback]
+
+    if is_function(callback, 1) do
+      Enum.each(jobs, callback)
+    end
+
     {count, _returned} =
       Job
       |> where([j], j.id in ^Enum.map(jobs, & &1.id))
@@ -595,7 +601,17 @@ defmodule Cue do
       Removes all jobs for this handler. You can filter further by options described in `Cue.remove_jobs/2`.
       """
       def remove_jobs(opts \\ []) do
-        opts |> merge_with_module_defaults() |> Cue.remove_jobs()
+        callback =
+          if function_exported?(__MODULE__, :on_delete, 2) do
+            fn job ->
+              apply(__MODULE__, :on_delete, [job.name, job.state])
+            end
+          end
+
+        opts
+        |> Keyword.put(:callback, callback)
+        |> merge_with_module_defaults()
+        |> Cue.remove_jobs()
       end
 
       @doc """

@@ -71,6 +71,18 @@ defmodule CueTest do
     end
   end
 
+  defmodule OnDelete do
+    use Cue, schedule: "*/2 * * * *"
+
+    def handle_job(_, _), do: :ok
+
+    def handle_job_error(_, _, _), do: :ok
+
+    def on_delete(name, state) do
+      if state[:fun], do: state[:fun].(name)
+    end
+  end
+
   describe "create_job/1" do
     test "validates" do
       assert {:error, {:invalid_schedule, _msg}} = Cue.create_job([])
@@ -609,6 +621,32 @@ defmodule CueTest do
       assert @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2a.name)
       assert @repo.get_by(Job, name: job_2b.name)
+    end
+
+    test "if on_delete defined then it is invoked before delete", context do
+      %{agent: agent} = agent(context)
+
+      deleted_jobs = ["job1", "job2"]
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ^deleted_jobs -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ^deleted_jobs -> :ok end)
+
+      state = %{
+        fun: fn name ->
+          Agent.update(agent, fn state -> Map.update(state, :jobs, [name], &[name | &1]) end)
+        end
+      }
+
+      job_1 = OnDelete.create_job!(name: "job1", state: state)
+      job_2 = OnDelete.create_job!(name: "job2", state: state)
+      job_3 = ExampleWithOpts.create_job!(name: "job3", state: state)
+
+      OnDelete.remove_jobs()
+
+      refute @repo.get_by(Job, name: job_1.name)
+      refute @repo.get_by(Job, name: job_2.name)
+      assert @repo.get_by(Job, name: job_3.name)
+
+      assert Agent.get(agent, fn state -> state.jobs end) == Enum.reverse(deleted_jobs)
     end
 
     test "list_jobs is defined and by default is scoped to jobs defined by module" do
