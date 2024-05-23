@@ -71,7 +71,7 @@ defmodule Cue do
 
   use Supervisor
 
-  def repo, do: Application.fetch_env!(:cue, :repo)
+  @repo Application.compile_env!(:cue, :repo)
 
   def start_link do
     Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -180,7 +180,7 @@ defmodule Cue do
   """
   @spec remove_all_jobs() :: non_neg_integer()
   @spec remove_all_jobs(atom()) :: non_neg_integer()
-  def remove_all_jobs(repo \\ repo()) do
+  def remove_all_jobs(repo \\ @repo) do
     Cue.Scheduler.impl().pause()
     {count, _returned} = repo.delete_all(Job)
     Cue.Scheduler.impl().resume()
@@ -197,7 +197,7 @@ defmodule Cue do
   """
   @spec remove_job(name()) :: non_neg_integer()
   @spec remove_job(atom(), name()) :: non_neg_integer()
-  def remove_job(repo \\ repo(), job_name) do
+  def remove_job(repo \\ @repo, job_name) do
     # Synchronously remove job from scheduling/processing
     Cue.Scheduler.impl().add_job_to_ignored(job_name)
 
@@ -227,7 +227,7 @@ defmodule Cue do
   """
   @spec remove_jobs(keyword()) :: non_neg_integer()
   def remove_jobs(opts) when is_list(opts) do
-    repo = Keyword.get(opts, :repo, repo())
+    repo = Keyword.get(opts, :repo, @repo)
     where = Keyword.fetch!(opts, :where)
 
     jobs =
@@ -289,7 +289,7 @@ defmodule Cue do
   def list_jobs(opts \\ []) do
     order_by = Keyword.get(opts, :order_by, desc: :run_at)
     where = Keyword.get(opts, :where)
-    repo = Keyword.get(opts, :repo, repo())
+    repo = Keyword.get(opts, :repo, @repo)
 
     Job
     |> order_by(^order_by)

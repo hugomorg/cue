@@ -8,7 +8,7 @@ defmodule Cue.Scheduler.Impl do
   import Ecto.Query
   alias Cue.Scheduler
   alias Cue.Job
-  @repo Application.compile_env(:cue, :repo)
+  @repo Application.compile_env!(:cue, :repo)
 
   @check_interval Application.compile_env(:cue, :check_interval, 1000)
 

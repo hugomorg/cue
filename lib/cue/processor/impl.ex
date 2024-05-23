@@ -7,7 +7,7 @@ defmodule Cue.Processor.Impl do
   import Ecto.Query
   alias Cue.Job
   alias Cue.Processor
-  @repo Application.compile_env(:cue, :repo)
+  @repo Application.compile_env!(:cue, :repo)
   @max_concurrency Application.compile_env(:cue, :max_concurrency, 5)
   @timeout Application.compile_env(:cue, :timeout, 5000)
 
