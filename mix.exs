@@ -36,6 +36,7 @@ defmodule Cue.MixProject do
     [test: ["ecto.drop", "ecto.create --quiet", "ecto.migrate", "test"]]
   end
 
-  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/support"]
+  defp elixirc_paths(env) when env in [:test], do: ["lib", "test/support"]
+  defp elixirc_paths(env) when env in [:dev], do: ["lib", "test/support/test_repo.ex"]
   defp elixirc_paths(_), do: ["lib"]
 end
