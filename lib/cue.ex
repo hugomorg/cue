@@ -73,13 +73,13 @@ defmodule Cue do
 
   def repo, do: Application.fetch_env!(:cue, :repo)
 
-  def start_link(init_arg) do
-    Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
+  def start_link do
+    Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
   @impl true
   def init(_init_arg) do
-    children = [{Task.Supervisor, name: Cue.TaskProcessor}, Cue.Scheduler]
+    children = [{Task.Supervisor, name: Cue.TaskProcessor}, Cue.Scheduler.impl()]
 
     children
     |> maybe_start_test_repo()

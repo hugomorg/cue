@@ -13,4 +13,5 @@ config :cue, Cue.TestRepo,
   pool: Ecto.Adapters.SQL.Sandbox
 
 config :cue, Cue.TestRepo, migration_timestamps: [type: :utc_datetime_usec]
+config :cue, :start_test_repo?, true
 config :cue, repo: Cue.TestRepo
