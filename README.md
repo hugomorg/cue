@@ -110,7 +110,7 @@ end
 
 Ok, so now we know how to schedule jobs. But what about one-off jobs? If the weather is really bad, maybe you want to send an email. But you don't want this to repeat - just ensure it is handled properly within a certain time-frame.
 
-Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1` / `create_job/1`. If you want the job to run immediately you can do something like `create_job!(schedule: DateTime.utc_now())` (don't worry if it is in the past, it will still run immediately).
+Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1` / `create_job/1`. If you want the job to run immediately you can do something like `YourApp.create_job!(schedule: DateTime.utc_now())` (don't worry if it is in the past, it will still run immediately).
 
 This will not repeat, even if it fails.
 
@@ -142,7 +142,7 @@ OK, next problem. You are fetching the weather every minute, and you want to kee
 
 In other words, you want to keep "context" or "state". Doing this with `cue` is simple. Just return `{:ok, {:state, next_state}}` from the job handler, where `next_state` is the entire state you want the job to have. The handler will receive the latest state on the next run.
 
-Apart from returning error tuples, anything else returned from the job handler will not be treated in a special way.
+Apart from returning error tuples (see below), anything else returned from the job handler will not be treated in a special way.
 
 If you want to avoid a `nil` state on the first `handle_job/2` call or have some expensive setup, just define a callback `init/1` in your module. This will get called with the `name` of the job. It gets run once, when the job is created, and is used to initialise the state for that particular job.
 
@@ -178,7 +178,7 @@ end
 
 ## Error handling
 
-In the context of `cue` there are two types of errors: crashes and errors returned by you.
+In the context of `Cue` there are two types of errors: crashes and errors returned by you.
 
 If there is a crash, it will get caught, and your error handler `handle_job_error/3` will be invoked. The job is marked as failed. If you return an `{error, reason}` tuple from `handle_job/2`, exactly the same thing will happen.
 
@@ -211,7 +211,7 @@ end
 
 ## Concurrency and timeouts
 
-Under the hood, each job is run as an Elixir [`Task`](https://hexdocs.pm/elixir/Task.html). You can specify the timeout in your config (in milliseconds). Default is 5000 ms, or 5 seconds.
+Under the hood, each job is run as an Elixir [`Task`](https://hexdocs.pm/elixir/Task.html). You can specify the `timeout` in your config (in milliseconds). Default is 5000 ms, or 5 seconds.
 
 Concurrency is also configurable with `max_concurrency`. This is important to consider in case you have a lot of jobs scheduled to run at the same time, but your database connections are relatively limited. In such a case, you might want to start it with a small number, and increase it. The default is `5`.
 
