@@ -14,6 +14,8 @@ end
 
 Don't forget to run `mix ecto.migrate`!
 
+This will create a table `cue_jobs` and some indexes.
+
 You will need specify your `Repo` module:
 
 ```elixir
@@ -35,6 +37,8 @@ defmodule YourApp.Application do
   end
 end
 ```
+
+Or to give it a spin, run `Cue.start_link`.
 
 The next step is scoping the job to a module. As a concrete example, let's assume you have a weather app which needs the latest weather. You want to be quite up-to-date so you decide to call it every minute. In other words, you want to run a job which is scheduled to repeat every minute.
 
@@ -65,15 +69,15 @@ Just one final step: when your app is running, call `YourApp.create_job!()`.
 
 This creates the job, and everything else will be taken care of!
 
+If you don't specify a name, the module is used as the default name. But names must be unique.
+
 ## One module, multiple jobs
 
 Let's look at a slightly more complex example. You want to fetch the weather across different continents (let's say London and New York), so there are different APIs. However, you still want to group them under one module.
 
-No problem: just call `YourApp.create_job!(name: city)` where `city` is the unique name you choose for the job. Then you can just pattern match.
+No problem: just call `YourApp.create_job!(name: city)` where `city` is the unique name you choose for the job. Then you can just pattern match when the job is handled.
 
-If you don't specify a name, the module is used as the default name.
-
-If you want to remove a job, it's: `YourApp.remove_job(name)`. If `name` isn't passed, the module is again used as the default.
+If you have some code which automatically creates jobs, then a useful alternative is `YourApp.create_job/1` / `YourApp.create_job!/1` which creates the job but does nothing if it exists, instead of causing an error.
 
 ```elixir
 defmodule YourApp do
@@ -106,19 +110,35 @@ end
 
 Ok, so now we know how to schedule jobs. But what about one-off jobs? If the weather is really bad, maybe you want to send an email. But you don't want this to repeat - just ensure it is handled properly within a certain time-frame.
 
-Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1`/`create_job/1`. If you want the job to run immediately you can do something like `create_job!(schedule: DateTime.utc_now())` (don't worry if it is slightly in the past, it will still run immediately).
+Simply pass a UTC `DateTime` as the `schedule` in `create_job!/1` / `create_job/1`. If you want the job to run immediately you can do something like `create_job!(schedule: DateTime.utc_now())` (don't worry if it is in the past, it will still run immediately).
+
+This will not repeat, even if it fails.
 
 ## Deleting jobs
 
-Jobs are not automatically deleted. To delete all jobs scoped to `YourModule`, simply call `YourModule.remove_jobs()`. For more advanced filtering see `Cue.remove_jobs/1`.
+If you want to remove a single job, it's: `YourApp.remove_job(name)`.
+
+You can also remove all jobs that the module handles with `YourApp.remove_jobs()`.
+
+You can filter more precisely, for example `YourApp.remove_jobs(where: [name: [ilike: "job%"]])`. See `Cue.remove_jobs/1` for more info.
+
+If you define an `on_delete/2` handler in your module, this will get called just before the jobs are deleted, if you need to do any cleanup. This runs before any job is deleted, so if there is a crash no jobs will get deleted.
 
 ## How can I see all the jobs?
 
-To see jobs scoped to a module, call `YourModule.jobs()`. For more global searches, see `Cue.list_jobs/1`.
+To see jobs scoped to a module, call `YourApp.list_jobs()`.
+
+Both of these take some filtering options. Say you wanted to find only failed jobs that failed before a certain time. You could do this:
+
+```elixir
+YourModule.list_jobs(where: [status: :failed], [failed_at: [<: some_date_time]])
+```
+
+For more global searches and options, see `Cue.list_jobs/1`.
 
 ## Keeping context / state
 
-OK, next problem. You are fetching the weather every minute, and you want to keep the last prediction to detect a change.
+OK, next problem. You are fetching the weather every minute, and you want to keep a running average of the rainfall.
 
 In other words, you want to keep "context" or "state". Doing this with `cue` is simple. Just return `{:ok, {:state, next_state}}` from the job handler, where `next_state` is the entire state you want the job to have. The handler will receive the latest state on the next run.
 
@@ -136,13 +156,15 @@ defmodule YourApp do
 
   @impl true
   def init(name) do
-    {:ok, %{latest_weather: WeatherAPI.list()}}
+    {:ok, %{data: [], averages: [], window_size: 5}}
   end
 
   @impl true
   def handle_job(name, state) do
-    # Compare current weather to past weather here...
-    {:ok, %{state | latest_weather: WeatherAPI.list()}}
+    latest_rainfall = WeatherAPI.get_rainfall()
+    next_data = Enum.take([latest_rainfall | state.data], state.window_size)
+    average = Enum.sum(next_data) / length(next_data)
+    {:ok, %{state | data: next_data, averages: [average | state.averages]}}
   end
 
   @impl true
