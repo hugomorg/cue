@@ -615,6 +615,22 @@ defmodule Cue do
       end
 
       @doc """
+      Same as `Cue.remove_job/1`.
+      """
+      def remove_job(name) when is_binary(name) do
+        callback =
+          if function_exported?(__MODULE__, :on_delete, 2) do
+            fn job ->
+              apply(__MODULE__, :on_delete, [job.name, job.state])
+            end
+          end
+
+        [callback: callback, where: [name: name]]
+        |> merge_with_module_defaults()
+        |> Cue.remove_jobs()
+      end
+
+      @doc """
       Lists all jobs for this handler. Can filter further as described in `Cue.list_jobs/1`.
       """
       def list_jobs(opts \\ []) do

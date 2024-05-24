@@ -607,7 +607,7 @@ defmodule CueTest do
       assert inserted_job.state == %{key: :value}
     end
 
-    test "remove is defined and by default is scoped to jobs defined by module" do
+    test "remove_jobs is defined and by default is scoped to jobs defined by module" do
       deleted_jobs = ["job2a"]
       expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ^deleted_jobs -> :ok end)
       expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ^deleted_jobs -> :ok end)
@@ -645,6 +645,44 @@ defmodule CueTest do
       refute @repo.get_by(Job, name: job_1.name)
       refute @repo.get_by(Job, name: job_2.name)
       assert @repo.get_by(Job, name: job_3.name)
+
+      assert Agent.get(agent, fn state -> state.jobs end) == Enum.reverse(deleted_jobs)
+    end
+
+    test "remove_job is defined and by default is scoped to jobs defined by module" do
+      deleted_jobs = ["job1"]
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ^deleted_jobs -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ^deleted_jobs -> :ok end)
+
+      job_1 = ExampleMinimal.create_job!(name: "job1")
+      job_2 = ExampleMinimal.create_job!(name: "job2")
+
+      ExampleMinimal.remove_job(job_1.name)
+
+      refute @repo.get_by(Job, name: job_1.name)
+      assert @repo.get_by(Job, name: job_2.name)
+    end
+
+    test "if on_delete defined then it is invoked before delete - remove_job", context do
+      %{agent: agent} = agent(context)
+
+      deleted_jobs = ["job1"]
+      expect(Cue.Scheduler.Mock, :add_jobs_to_ignored, fn ^deleted_jobs -> :ok end)
+      expect(Cue.Scheduler.Mock, :remove_jobs_from_ignored, fn ^deleted_jobs -> :ok end)
+
+      state = %{
+        fun: fn name ->
+          Agent.update(agent, fn state -> Map.update(state, :jobs, [name], &[name | &1]) end)
+        end
+      }
+
+      job_1 = OnDelete.create_job!(name: "job1", state: state)
+      job_2 = OnDelete.create_job!(name: "job2", state: state)
+
+      OnDelete.remove_job(job_1.name)
+
+      refute @repo.get_by(Job, name: job_1.name)
+      assert @repo.get_by(Job, name: job_2.name)
 
       assert Agent.get(agent, fn state -> state.jobs end) == Enum.reverse(deleted_jobs)
     end
