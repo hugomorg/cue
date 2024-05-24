@@ -44,7 +44,7 @@ The next step is scoping the job to a module. As a concrete example, let's assum
 
 A schedule can be either a [cron specification](https://crontab.guru/) or a UTC `DateTime` value (see more below).
 
-You can use `cue` like this:
+You can use `Cue` like this:
 
 ```elixir
 defmodule YourApp do
@@ -77,7 +77,7 @@ Let's look at a slightly more complex example. You want to fetch the weather acr
 
 No problem: just call `YourApp.create_job!(name: city)` where `city` is the unique name you choose for the job. Then you can just pattern match when the job is handled.
 
-If you have some code which automatically creates jobs, then a useful alternative is `YourApp.create_job/1` / `YourApp.create_job!/1` which creates the job but does nothing if it exists, instead of causing an error.
+If you have some code which automatically creates jobs, then a useful alternative is `YourApp.create_job_unless_exists/1` / `YourApp.create_job_unless_exists!/1` which creates the job but does nothing if it exists, instead of causing an error.
 
 ```elixir
 defmodule YourApp do
