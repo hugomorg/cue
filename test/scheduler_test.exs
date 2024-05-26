@@ -31,6 +31,9 @@ defmodule Cue.SchedulerTest do
       _too_many_retries =
         make_job!(handler: Example, run_at: now, max_retries: 3, retry_count: 4, status: :failed)
 
+      _processing = make_job!(handler: Example, run_at: now, status: :processing)
+      _paused = make_job!(handler: Example, run_at: now, status: :paused)
+
       no_max_retries =
         make_job!(
           handler: Example,
@@ -40,8 +43,24 @@ defmodule Cue.SchedulerTest do
           status: :failed
         )
 
+      stuck_job =
+        make_job!(
+          handler: Example,
+          status: :processing,
+          run_at: DateTime.add(now, -(5000 + 120_000), :millisecond)
+        )
+
+      _almost_stuck_job =
+        make_job!(
+          handler: Example,
+          status: :processing,
+          run_at: DateTime.add(now, -(5000 + 0), :millisecond)
+        )
+
       expect(Cue.Processor.Mock, :process_jobs, fn jobs ->
-        assert Enum.map(jobs, & &1.id) == Enum.map([one_off_job, no_max_retries], & &1.id)
+        assert Enum.map(jobs, & &1.id) ==
+                 Enum.map([stuck_job, one_off_job, no_max_retries], & &1.id)
+
         send(parent, {ref, :process_jobs})
 
         :ok
